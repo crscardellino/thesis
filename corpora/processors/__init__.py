@@ -2,8 +2,7 @@
 
 from __future__ import absolute_import, unicode_literals
 
-import fnmatch
-import os
+from corpora.utils import find
 from lxml import etree
 
 
@@ -23,9 +22,8 @@ class XMLCorpusReader(object):
 
     @property
     def files(self):
-        for root, _, filenames in os.walk(self._path):
-            for filename in fnmatch.filter(filenames, self._files):
-                yield os.path.join(root, filename)
+        for file_path in find(self._path, self._files):
+            yield file_path
 
     def _parse_docs(self):
         for filename in self.files:

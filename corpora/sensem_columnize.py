@@ -6,9 +6,8 @@ from __future__ import absolute_import, print_function, unicode_literals
 import argparse
 import sys
 
-from tqdm import tqdm
-
 from corpora.processors.sensem import SenSemCorpusReader
+from tqdm import tqdm
 
 
 if __name__ == "__main__":

@@ -28,12 +28,6 @@ class Word(object):
     def __setitem__(self, key, value):
         self._extras[key] = value
 
-    def __setattr__(self, key, value):
-        if key in self:
-            self[key] = value
-        else:
-            object.__setattr__(self, key, value)
-
     def __repr__(self):
         return '<Word: %s>' % self.token
 
@@ -62,12 +56,6 @@ class Sentence(object):
 
     def __setitem__(self, key, value):
         self._metadata[key] = value
-
-    def __setattr__(self, key, value):
-        if key in self:
-            self[key] = value
-        else:
-            object.__setattr__(self, key, value)
 
     def __iter__(self):
         for word in self._words:

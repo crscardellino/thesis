@@ -21,17 +21,17 @@ def search_main_verb(sentence):
     return -1
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("corpus",
-                        help="SenSem column file path")
-    parser.add_argument("--output",
+    parser.add_argument('corpus',
+                        help='SenSem column file path')
+    parser.add_argument('--output',
                         default=None,
-                        help="Output file to write (defaults to STDOUT)")
+                        help='Output file to write (defaults to STDOUT)')
     args = parser.parse_args()
 
-    output = sys.stdout if args.output is None else open(args.output, "w")
+    output = sys.stdout if args.output is None else open(args.output, 'w')
 
     parser = ColumnCorpusParser(args.corpus, 'idx', 'token', 'lemma', 'pos')
 
@@ -75,4 +75,4 @@ if __name__ == "__main__":
     if args.output is not None:
         output.close()
 
-    print("SenSem corpus parsed", file=sys.stderr)
+    print('SenSem corpus parsed', file=sys.stderr)

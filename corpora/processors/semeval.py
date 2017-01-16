@@ -99,9 +99,9 @@ class SemevalTestCorpusReader(SemevalTrainCorpusReader):
         super(SemevalTestCorpusReader, self).__init__(path, files)
 
         self._test_results = {}
-        with open(next(find(self._path, self._key_file)), 'rb') as f:
+        with open(next(find(self._path, self._key_file)), 'r') as f:
             for line in f:
-                lemma, sentenceid, sense = line.decode().strip().split()
+                lemma, sentenceid, sense = line.strip().split()
                 lemma, lemma_pos = lemma.split('.')
 
                 self._test_results[(lemma, lemma_pos, sentenceid)] = sense

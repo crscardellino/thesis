@@ -6,10 +6,10 @@ from __future__ import absolute_import, unicode_literals
 class Word(object):
     def __init__(self, word, columns):
         word = dict(zip(columns, word.split()))
-        self.idx = int(word.pop('idx'))
+        self.idx = word.pop('idx')
         self.token = word.pop('token')
         self.lemma = word.pop('lemma')
-        self.pos = word.get('pos')
+        self.pos = word.pop('pos')
 
         self._extras = word.copy()
 
@@ -32,7 +32,7 @@ class Word(object):
         return '<Word: %s>' % self.token
 
     def __str__(self):
-        return '%d\t%s\t%s\t%s\t%s' % (self.idx, self.token, self.lemma, self.pos, '\t'.join(self.extras))
+        return '%d\t%s\t%s\t%s\t%s' % (self.idx, self.token, self.lemma, self.pos, '\t'.join(self._extras))
 
 
 class Sentence(object):

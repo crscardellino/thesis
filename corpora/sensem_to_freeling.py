@@ -9,11 +9,12 @@ import sys
 
 from corpora.parsers import ColumnCorpusParser
 from corpora.parsers.freeling import Freeling
+from tqdm import tqdm
 
 
 def search_main_verb(sentence):
-    for line in sentence.split():
-        lemma = line[2].split('|')
+    for line in sentence.strip().split('\n'):
+        lemma = line.split()[2].split('|')
 
         if lemma[-1] == 'main_verb':
             return int(line[0])
@@ -29,6 +30,9 @@ if __name__ == '__main__':
     parser.add_argument('--output',
                         default=None,
                         help='Output file to write (defaults to STDOUT)')
+    parser.add_argument('--sentence',
+                        default=24207,
+                        help='Number of sentences to parse')
     args = parser.parse_args()
 
     output = sys.stdout if args.output is None else open(args.output, 'w')
@@ -38,40 +42,51 @@ if __name__ == '__main__':
     freeling = Freeling(language='es', input_format='freeling', input_level='splitted', output_format='conll',
                         output_level='dep', multiword=True, ner=True, nec=True)
 
-    for sentence in parser.sentences:
+    freeling_sentences = []
+    sentences_metadata = []
+    for sidx, sentence in enumerate(tqdm(parser.sentences, total=24207)):
         freeling_sentence = []
         word = ''
-        for word in sentence:
-            word = word.token
-            word += '\t%s' % word.lemma
+        for wrd in sentence:
+            word = wrd.token
+            word += '\t%s' % wrd.lemma
 
-            if sentence.verb_position == word.idx:
+            if sentence.verb_position == wrd.idx:
                 word += '|main_verb'
 
-            word += '\t%s' % word.pos
+            word += '\t%s' % wrd.pos
             word += '\t1'
 
-        freeling_sentence.append(word)
+            freeling_sentence.append(word)
 
-        (parsed_sentence, parsed_errors), returncode = freeling.run(freeling_sentence)
+        freeling_sentences.append(freeling_sentence)
+        sentences_metadata.append(sentence.metadata_string)
 
-        if returncode != os.EX_OK:
-            print('Parser error: %s' % parsed_errors, file=sys.stderr)
-            sys.exit(returncode)
-        elif parsed_errors.strip() != '':
-            print('Parser warnings: %s' % parsed_errors, file=sys.stderr)
+        if sidx % 1000 == 0:
+            tqdm.write('Parsing sentences', file=sys.stderr)
+            (parsed_sentences, parsed_errors), returncode = freeling.run(freeling_sentences)
+            parsed_sentences = parsed_sentences.decode('utf-8')
+            parsed_errors = parsed_errors.decode('utf-8')
+         
+            if returncode != os.EX_OK:
+                tqdm.write('Parser error: %s' % parsed_errors, file=sys.stderr)
+                sys.exit(returncode)
 
-        new_index_for_verb = search_main_verb(parsed_sentence)
-        if search_main_verb(parsed_sentence) != -1:
-            sentence['verb_position'] = str(new_index_for_verb)
-        else:
-            print('Verb not found. Please select verb index:\n%s' % parsed_sentence, file=sys.stderr)
-            sentence['verb_position'] = input('Verb index: ')
+            for metadata, parsed_sentence in zip(sentences_metadata, parsed_sentences.strip().split('\n\n')):
+                print(metadata, file=output)
+                print(parsed_sentence.strip(), file=output)
+                print('', file=output)
 
-        print(sentence.metadata_string, file=output)
-        print(parsed_sentence.rstrip(), file=output)
-        print('', file=output)
+            freeling_sentence = []
+            sentences_metadata = []
 
+#   for sidx, parsed_sentence in enumerate(tqdm(parsed_sentences.strip().split('\n\n'))):
+#       new_index_for_verb = search_main_verb(parsed_sentence)
+#       if search_main_verb(parsed_sentence) != -1:
+#           sentences_metadata[sidx]['verb_position'] = str(new_index_for_verb)
+#       else:
+#           print('Verb not found. Please select verb index:\n%s' % parsed_sentence, file=sys.stderr)
+#           sentences_metadata[sidx]['verb_position'] = input('Verb index: ')
     if args.output is not None:
         output.close()
 

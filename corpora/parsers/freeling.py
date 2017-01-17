@@ -60,7 +60,6 @@ class Freeling(object):
             cmd.append('-f %s' % os.path.abspath(self._config_file_path))
         else:
             cmd.append('-f %s.cfg' % self._language)
-            cmd.append('--locale %s' % self._language)
             cmd.append('--input %s' % self._input_format)
             cmd.append('--inplv %s' % self._input_level)
             cmd.append('--output %s' % self._output_format)
@@ -76,7 +75,7 @@ class Freeling(object):
 
         return cmd
 
-    def run(self, sentence):
+    def run(self, sentences):
         """
         Run analyzer script according to the options given in the constructor.
 
@@ -85,7 +84,13 @@ class Freeling(object):
         :return: Output and error of the analyzer script.
         """
 
-        process = Popen(self._build_command(), stdin=PIPE, stdout=PIPE, stderr=PIPE)
-        sentence = '\n'.join(sentence) if isinstance(sentence, list) else sentence
+        assert sentences != [], 'The given sentence must be a string or a non empty list'
 
-        return process.communicate(sentence), process.returncode
+        process = Popen(self._build_command(), stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        if isinstance(sentences, list) and isinstance(sentences[0], list):
+            sentences = '\n\n'.join('\n'.join(sentence) for sentence in sentences)
+        elif isinstance(sentences, list):
+            sentences = '\n'.join(sentences)
+        sentences += '\n\n'
+
+        return process.communicate(sentences.encode('utf-8')), process.returncode

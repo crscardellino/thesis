@@ -70,7 +70,7 @@ class Sentence(object):
     @property
     def metadata_string(self):
         return 'META:%s\tsentence:%s\t%s' % \
-               (self._corpus_name, self._sentence, '\t'.join(':'.join(d) for d in self._metadata))
+               (self._corpus_name, self._sentence, '\t'.join(':'.join(d) for d in self._metadata.items()))
 
     def get_word_by_index(self, index):
         assert index > 0 and index == self._words[index-1].idx

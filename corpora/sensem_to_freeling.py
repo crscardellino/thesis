@@ -80,13 +80,6 @@ if __name__ == '__main__':
             freeling_sentence = []
             sentences_metadata = []
 
-#   for sidx, parsed_sentence in enumerate(tqdm(parsed_sentences.strip().split('\n\n'))):
-#       new_index_for_verb = search_main_verb(parsed_sentence)
-#       if search_main_verb(parsed_sentence) != -1:
-#           sentences_metadata[sidx]['verb_position'] = str(new_index_for_verb)
-#       else:
-#           print('Verb not found. Please select verb index:\n%s' % parsed_sentence, file=sys.stderr)
-#           sentences_metadata[sidx]['verb_position'] = input('Verb index: ')
     if args.output is not None:
         output.close()
 

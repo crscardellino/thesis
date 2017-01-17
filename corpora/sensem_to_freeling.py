@@ -41,17 +41,17 @@ if __name__ == '__main__':
     for sentence in parser.sentences:
         freeling_sentence = []
         word = ''
-        for word in sentence:
-            word = word.token
-            word += '\t%s' % word.lemma
+        for wrd in sentence:
+            word = wrd.token
+            word += '\t%s' % wrd.lemma
 
-            if sentence.verb_position == word.idx:
+            if sentence.verb_position == wrd.idx:
                 word += '|main_verb'
 
-            word += '\t%s' % word.pos
+            word += '\t%s' % wrd.pos
             word += '\t1'
 
-        freeling_sentence.append(word)
+            freeling_sentence.append(word)
 
         (parsed_sentence, parsed_errors), returncode = freeling.run(freeling_sentence)
 

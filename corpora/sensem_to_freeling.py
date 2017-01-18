@@ -63,7 +63,6 @@ if __name__ == '__main__':
         sentences_metadata.append(sentence.metadata_string)
 
         if sidx % 1000 == 0:
-            tqdm.write('Parsing sentences', file=sys.stderr)
             (parsed_sentences, parsed_errors), returncode = freeling.run(freeling_sentences)
             parsed_sentences = parsed_sentences.decode('utf-8')
             parsed_errors = parsed_errors.decode('utf-8')

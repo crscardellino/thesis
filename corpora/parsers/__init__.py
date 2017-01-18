@@ -56,6 +56,9 @@ class Sentence(object):
         else:
             raise AttributeError
 
+    def __len__(self):
+        return len(self._words)
+
     def __setitem__(self, key, value):
         self._metadata[key] = value
 
@@ -75,7 +78,7 @@ class Sentence(object):
                (self._corpus_name, self._sentence_index, '\t'.join(':'.join(d) for d in sorted(self._metadata.items())))
 
     def get_word_by_index(self, index):
-        assert index > 0 and index == self._words[index-1].idx
+        assert index > 0 and index == int(self._words[index-1].idx)
         return self._words[index-1]
 
     @property

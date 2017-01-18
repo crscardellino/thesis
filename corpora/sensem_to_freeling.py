@@ -30,12 +30,12 @@ if __name__ == '__main__':
     parser.add_argument('--output',
                         default=None,
                         help='Output file to write (defaults to STDOUT)')
-    parser.add_argument('--sentence',
+    parser.add_argument('--sentences',
                         default=24207,
                         help='Number of sentences to parse')
     args = parser.parse_args()
 
-    output = sys.stdout if args.output is None else open(args.output, 'w')
+    output = sys.stdout if args.output is None else open(args.output, 'a')
 
     parser = ColumnCorpusParser(args.corpus, 'idx', 'token', 'lemma', 'pos')
 
@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
     freeling_sentences = []
     sentences_metadata = []
-    for sidx, sentence in enumerate(tqdm(parser.sentences, total=24207), start=1):
+    for sidx, sentence in enumerate(tqdm(parser.sentences, total=args.sentences), start=1):
         freeling_sentence = []
         word = ''
         for wrd in sentence:
@@ -62,8 +62,7 @@ if __name__ == '__main__':
         freeling_sentences.append(freeling_sentence)
         sentences_metadata.append(sentence.metadata_string)
 
-        if sidx % 1000 == 0:
-            tqdm.write('Parsing sentences', file=sys.stderr)
+        if (sidx % 1000 == 0) or (sidx == args.sentences):
             (parsed_sentences, parsed_errors), returncode = freeling.run(freeling_sentences)
             parsed_sentences = parsed_sentences.decode('utf-8')
             parsed_errors = parsed_errors.decode('utf-8')

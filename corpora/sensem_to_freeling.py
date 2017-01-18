@@ -12,16 +12,6 @@ from corpora.parsers.freeling import Freeling
 from tqdm import tqdm
 
 
-def search_main_verb(sentence):
-    for line in sentence.strip().split('\n'):
-        lemma = line.split()[2].split('|')
-
-        if lemma[-1] == 'main_verb':
-            return int(line[0])
-
-    return -1
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 

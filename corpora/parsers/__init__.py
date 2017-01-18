@@ -2,10 +2,12 @@
 
 from __future__ import absolute_import, unicode_literals
 
+from collections import OrderedDict
+
 
 class Word(object):
     def __init__(self, word, columns):
-        word = dict(zip(columns, word.split()))
+        word = OrderedDict(zip(columns, word.split()))
         self.idx = word.pop('idx')
         self.token = word.pop('token')
         self.lemma = word.pop('lemma')
@@ -32,13 +34,13 @@ class Word(object):
         return '<Word: %s>' % self.token
 
     def __str__(self):
-        return '%s\t%s\t%s\t%s\t%s' % (self.idx, self.token, self.lemma, self.pos, '\t'.join(self._extras))
+        return '%s\t%s\t%s\t%s\t%s' % (self.idx, self.token, self.lemma, self.pos, '\t'.join(self._extras.values()))
 
 
 class Sentence(object):
     def __init__(self, metadata, sentence, *columns):
         self._corpus_name = metadata.pop('META')
-        self._sentence = metadata.pop('sentence')
+        self._sentence_index = metadata.pop('sentence')
         self._metadata = metadata
         self._words = [Word(word, columns) for word in sentence]
 
@@ -70,7 +72,7 @@ class Sentence(object):
     @property
     def metadata_string(self):
         return 'META:%s\tsentence:%s\t%s' % \
-               (self._corpus_name, self._sentence, '\t'.join(':'.join(d) for d in sorted(self._metadata.items())))
+               (self._corpus_name, self._sentence_index, '\t'.join(':'.join(d) for d in sorted(self._metadata.items())))
 
     def get_word_by_index(self, index):
         assert index > 0 and index == self._words[index-1].idx
@@ -79,6 +81,10 @@ class Sentence(object):
     @property
     def corpus_name(self):
         return self._corpus_name
+
+    @property
+    def sentence_index(self):
+        return self._sentence_index
 
 
 class ColumnCorpusParser(object):

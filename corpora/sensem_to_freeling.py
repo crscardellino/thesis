@@ -29,8 +29,8 @@ if __name__ == '__main__':
 
     parser = ColumnCorpusParser(args.corpus, 'idx', 'token', 'lemma', 'pos')
 
-    freeling = Freeling(language='es', input_format='freeling', input_level='splitted', output_format='conll',
-                        output_level='dep', multiword=True, ner=True, nec=True)
+    freeling = Freeling(language='es', input_format='freeling', input_level='tagged', output_format='conll',
+                        output_level='dep', multiword=False, ner=False, nec=False)
 
     freeling_sentences = []
     sentences_metadata = []

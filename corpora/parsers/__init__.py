@@ -8,7 +8,7 @@ from collections import OrderedDict
 class Word(object):
     def __init__(self, word, columns):
         word = OrderedDict(zip(columns, word.split()))
-        self.idx = word.pop('idx')
+        self.idx = int(word.pop('idx'))
         self.token = word.pop('token')
         self.lemma = word.pop('lemma')
         self.pos = word.pop('pos')
@@ -40,7 +40,7 @@ class Word(object):
 class Sentence(object):
     def __init__(self, metadata, sentence, *columns):
         self._corpus_name = metadata.pop('META')
-        self._sentence_index = metadata.pop('sentence')
+        self._sentence_index = int(metadata.pop('sentence'))
         self._metadata = metadata
         self._words = [Word(word, columns) for word in sentence]
 
@@ -67,7 +67,7 @@ class Sentence(object):
             yield word
 
     def __repr__(self):
-        return '<Sentence: %s>' % self._corpus_name
+        return '<Sentence: %s - Corpus: %s>' % (self._sentence_index, self._corpus_name)
 
     def __str__(self):
         return '\n'.join(str(word) for word in self)
@@ -75,10 +75,11 @@ class Sentence(object):
     @property
     def metadata_string(self):
         return 'META:%s\tsentence:%s\t%s' % \
-               (self._corpus_name, self._sentence_index, '\t'.join(':'.join(d) for d in sorted(self._metadata.items())))
+               (self._corpus_name, self._sentence_index,
+                '\t'.join(':'.join(d) for d in sorted(self._metadata.items())))
 
     def get_word_by_index(self, index):
-        assert index > 0 and index == int(self._words[index-1].idx)
+        assert index > 0 and index == self._words[index-1].idx
         return self._words[index-1]
 
     @property

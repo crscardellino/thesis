@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
     freeling_sentences = []
     sentences_metadata = []
-    for sidx, sentence in enumerate(tqdm(parser.sentences, total=24207)):
+    for sidx, sentence in enumerate(tqdm(parser.sentences, total=24207), start=1):
         freeling_sentence = []
         word = ''
         for wrd in sentence:

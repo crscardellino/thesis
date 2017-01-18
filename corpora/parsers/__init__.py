@@ -98,6 +98,8 @@ class ColumnCorpusParser(object):
                     sentence.append(line.strip())
                 else:
                     yield Sentence(metadata, sentence, *self._columns)
+                    metadata = {}
+                    sentence = []
 
     def __repr__(self):
         return '<ColumnCorpusParser>'

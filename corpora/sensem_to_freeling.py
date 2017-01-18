@@ -76,7 +76,7 @@ if __name__ == '__main__':
                 print(parsed_sentence.strip(), file=output)
                 print('', file=output)
 
-            freeling_sentence = []
+            freeling_sentences = []
             sentences_metadata = []
 
     if args.output is not None:

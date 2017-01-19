@@ -25,12 +25,12 @@ if __name__ == '__main__':
                         help='Number of sentences to parse')
     args = parser.parse_args()
 
-    output = sys.stdout if args.output is None else open(args.output, 'a')
+    output = sys.stdout if args.output is None else open(args.output, 'w')
 
     parser = ColumnCorpusParser(args.corpus, 'idx', 'token', 'lemma', 'pos')
 
     freeling = Freeling(language='es', input_format='freeling', input_level='tagged', output_format='conll',
-                        output_level='dep', multiword=False, ner=False, nec=False)
+                        output_level='dep', multiword=True, ner=True, nec=True)
 
     freeling_sentences = []
     sentences_metadata = []
@@ -41,7 +41,7 @@ if __name__ == '__main__':
             word = wrd.token
             word += '\t%s' % wrd.lemma
 
-            if sentence.verb_position == wrd.idx:
+            if sentence.verb_position == str(wrd.idx):
                 word += '|main_verb'
 
             word += '\t%s' % wrd.pos

@@ -67,15 +67,15 @@ class Sentence(object):
             yield word
 
     def __repr__(self):
-        return '<Sentence: %s - Corpus: %s>' % (self._sentence_index, self._corpus_name)
+        return '<Sentence: %05d - Corpus: %s>' % (int(self._sentence_index), self._corpus_name)
 
     def __str__(self):
         return '\n'.join(str(word) for word in self)
 
     @property
     def metadata_string(self):
-        return 'META:%s\tsentence:%s\t%s' % \
-               (self._corpus_name, self._sentence_index,
+        return 'META:%s\tsentence:%05d\t%s' % \
+               (self._corpus_name, int(self._sentence_index),
                 '\t'.join(':'.join(d) for d in sorted(self._metadata.items())))
 
     def get_word_by_index(self, index):

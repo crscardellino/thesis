@@ -55,13 +55,15 @@ if __name__ == '__main__':
             main_verb_index = search_main_verb(sentence)
 
             if main_verb_index == 0:
-                print('NO_CHANGE: Main verb position hasn\'t change for sentence %s' % sentence.sentence_index, file=flog)
+                print('NO_CHANGE: Main verb position hasn\'t change for sentence %s' % sentence.sentence_index,
+                      file=flog)
             elif main_verb_index > 0:
                 print('CHANGE: Main verb changed from position %s to position %d in sentence %s' %
                       (sentence.verb_position, main_verb_index, sentence.sentence_index), file=flog)
                 sentence['verb_position'] = str(main_verb_index)
             else:
-                print('NOT_FOUND: Main verb position wasn\'t found for sentence %s' % sentence.sentence_index, file=flog)
+                print('NOT_FOUND: Main verb position wasn\'t found for sentence %s' % sentence.sentence_index,
+                      file=flog)
 
             print(sentence.metadata_string, file=output)
             print(str(sentence), file=output)

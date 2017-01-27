@@ -4,7 +4,6 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
 import argparse
-import os
 import sh
 import sys
 
@@ -23,6 +22,9 @@ if __name__ == '__main__':
     parser.add_argument('--sentences',
                         default=4851,
                         help='Number of sentences to parse')
+    parser.add_argument('--server',
+                        default='http://localhost:9000',
+                        help='Full http address and port of the server')
     args = parser.parse_args()
 
     output = sys.stdout if args.output is None else open(args.output, 'w')
@@ -32,7 +34,7 @@ if __name__ == '__main__':
     for sidx, sentence in enumerate(tqdm(parser.sentences, total=args.sentences), start=1):
         tokenized_sentences = ' '.join(word.token for word in sentence)
 
-        parsed_sentences = sh.curl('--data', '%s' % tokenized_sentences, 'http://localhost:9000', '-o', '-')
+        parsed_sentences = sh.curl('--data', '%s' % tokenized_sentences, args.server, '-o', '-')
         parsed_sentences = [ps.split('\n') for ps in parsed_sentences.strip().split('\n\n')]
 
         original_lemma_idx = int(sentence.lemma_idx)
@@ -48,12 +50,14 @@ if __name__ == '__main__':
         else:
             lemma_idx = original_lemma_idx - 1
 
-        if parsed_sentences[lemma_sentence_idx][lemma_idx].strip().split()[1] != sentence.lemma:
-            print('NOT FOUND LEMMA for sentence %s' % sentence.sentence_index, file=sys.stderr)
+        if parsed_sentences[lemma_sentence_idx][lemma_idx].strip().split()[2] != sentence.lemma:
+            tqdm.write('NOT FOUND LEMMA for sentence %s' % sentence.sentence_index, file=sys.stdout)
             printing_sentence = '\n'.join('\n'.join(ps) for ps in parsed_sentences)
         else:
             sentence['lemma_idx'] = str(lemma_idx)
             printing_sentence = '\n'.join(parsed_sentences[lemma_sentence_idx])
+
+        printing_sentence = sh.column('-t', _in=printing_sentence.strip() + '\n')
 
         print(sentence.metadata_string, file=output)
         print(printing_sentence, file=output, end='\n\n')

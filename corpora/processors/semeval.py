@@ -8,7 +8,7 @@ import sys
 from corpora.utils import find
 from lxml import etree
 from nltk.stem import WordNetLemmatizer
-from . import XMLCorpusReader
+from corpora.processors.base import XMLCorpusReader
 
 if sys.version_info.major == 2:  # For Python 2 use lazy map
     from itertools import imap as map

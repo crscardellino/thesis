@@ -4,7 +4,7 @@ from __future__ import absolute_import, unicode_literals
 
 import itertools
 import sys
-from . import XMLCorpusReader
+from corpora.processors.base import XMLCorpusReader
 
 if sys.version_info.major == 2:  # For Python 2 use lazy map
     from itertools import imap as map

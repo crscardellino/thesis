@@ -7,8 +7,7 @@ import argparse
 import os
 import sys
 
-from corpora.parsers import ColumnCorpusParser
-from corpora.parsers.freeling import Freeling
+from corpora.parsers import ColumnCorpusParser, Freeling
 from tqdm import tqdm
 
 

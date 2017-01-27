@@ -34,7 +34,7 @@ if __name__ == '__main__':
     for sidx, sentence in enumerate(tqdm(parser.sentences, total=args.sentences), start=1):
         tokenized_sentences = ' '.join(word.token for word in sentence)
 
-        parsed_sentences = sh.curl('--data', '%s' % tokenized_sentences, args.server, '-o', '-')
+        parsed_sentences = sh.wget('--post-data', '%s' % tokenized_sentences, args.server, '-O', '-')
         parsed_sentences = [ps.split('\n') for ps in parsed_sentences.strip().split('\n\n')]
 
         original_lemma_idx = int(sentence.lemma_idx)
@@ -54,7 +54,7 @@ if __name__ == '__main__':
             tqdm.write('NOT FOUND LEMMA for sentence %s' % sentence.sentence_index, file=sys.stdout)
             printing_sentence = '\n'.join('\n'.join(ps) for ps in parsed_sentences)
         else:
-            sentence['lemma_idx'] = str(lemma_idx)
+            sentence['lemma_idx'] = str(lemma_idx + 1)
             printing_sentence = '\n'.join(parsed_sentences[lemma_sentence_idx])
 
         printing_sentence = sh.column('-t', _in=printing_sentence.strip() + '\n')

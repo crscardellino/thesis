@@ -63,8 +63,7 @@ if __name__ == '__main__':
 
             for metadata, parsed_sentence in zip(sentences_metadata, parsed_sentences.strip().split('\n\n')):
                 print(metadata, file=output)
-                print(parsed_sentence.strip(), file=output)
-                print('', file=output)
+                print(parsed_sentence.strip(), file=output, end='\n\n')
 
             freeling_sentences = []
             sentences_metadata = []

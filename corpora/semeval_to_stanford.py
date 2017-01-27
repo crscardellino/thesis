@@ -20,7 +20,7 @@ if __name__ == '__main__':
                         default=None,
                         help='Output file to write (defaults to STDOUT)')
     parser.add_argument('--sentences',
-                        default=4851,
+                        default=27132,
                         help='Number of sentences to parse')
     parser.add_argument('--server',
                         default='http://localhost:9000',

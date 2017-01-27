@@ -60,7 +60,7 @@ if __name__ == '__main__':
         printing_sentence = sh.column('-t', _in=printing_sentence.strip() + '\n')
 
         print(sentence.metadata_string, file=output)
-        print(printing_sentence, file=output, end='\n\n')
+        print(printing_sentence.strip(), file=output, end='\n\n')
 
     if args.output is not None:
         output.close()

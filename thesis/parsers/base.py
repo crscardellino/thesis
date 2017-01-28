@@ -5,13 +5,22 @@ from __future__ import absolute_import, unicode_literals
 from collections import OrderedDict
 
 
+def _isfloat(item):
+    try:
+        float(item)
+    except ValueError:
+        return False
+    else:
+        return True
+
+
 class Word(object):
     def __init__(self, word, columns):
         word = OrderedDict(zip(columns, word.split()))
         self.idx = int(word.pop('idx'))
         self.token = word.pop('token')
         self.lemma = word.pop('lemma')
-        self.pos = word.pop('pos')
+        self.tag = word.pop('tag')
 
         self._extras = word.copy()
 
@@ -19,7 +28,12 @@ class Word(object):
         return item in self._extras
 
     def __getitem__(self, item):
-        return self._extras[item]
+        if getattr(self._extras[item], 'isdigit', False):
+            return int(self._extras[item])
+        elif _isfloat(self._extras[item]):
+            return float(self._extras[item])
+        else:
+            return self._extras[item]
 
     def __getattr__(self, item):
         if item in self:
@@ -34,7 +48,7 @@ class Word(object):
         return '<Word: %s>' % self.token
 
     def __str__(self):
-        return '%s\t%s\t%s\t%s\t%s' % (self.idx, self.token, self.lemma, self.pos, '\t'.join(self._extras.values()))
+        return '%s\t%s\t%s\t%s\t%s' % (self.idx, self.token, self.lemma, self.tag, '\t'.join(self._extras.values()))
 
 
 class Sentence(object):
@@ -67,7 +81,7 @@ class Sentence(object):
             yield word
 
     def __repr__(self):
-        return '<Sentence: %05d - Corpus: %s>' % (int(self._sentence_index), self._corpus_name)
+        return '<Sentence: %05d - Corpus: %s>' % (self._sentence_index, self._corpus_name)
 
     def __str__(self):
         return '\n'.join(str(word) for word in self)
@@ -75,10 +89,11 @@ class Sentence(object):
     @property
     def metadata_string(self):
         return 'META:%s\tsentence:%05d\t%s' % \
-               (self._corpus_name, int(self._sentence_index),
+               (self._corpus_name, self._sentence_index,
                 '\t'.join(':'.join(d) for d in sorted(self._metadata.items())))
 
     def get_word_by_index(self, index):
+        index = int(index)
         assert index > 0 and index == self._words[index-1].idx
         return self._words[index-1]
 

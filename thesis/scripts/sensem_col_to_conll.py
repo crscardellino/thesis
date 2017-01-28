@@ -7,7 +7,7 @@ import argparse
 import os
 import sys
 
-from corpora.parsers import ColumnCorpusParser, Freeling
+from thesis.parsers import ColumnCorpusParser, Freeling
 from tqdm import tqdm
 
 
@@ -26,7 +26,7 @@ if __name__ == '__main__':
 
     output = sys.stdout if args.output is None else open(args.output, 'w')
 
-    parser = ColumnCorpusParser(args.corpus, 'idx', 'token', 'lemma', 'pos')
+    parser = ColumnCorpusParser(args.corpus, 'idx', 'token', 'lemma', 'tag')
 
     freeling = Freeling(language='es', input_format='freeling', input_level='tagged', output_format='conll',
                         output_level='dep', multiword=True, ner=True, nec=True)
@@ -43,7 +43,7 @@ if __name__ == '__main__':
             if sentence.verb_position == str(wrd.idx):
                 word += '|main_verb'
 
-            word += '\t%s' % wrd.pos
+            word += '\t%s' % wrd.tag
             word += '\t1'
 
             freeling_sentence.append(word)

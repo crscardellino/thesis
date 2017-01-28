@@ -6,7 +6,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 import argparse
 import sys
 
-from corpora.processors import SemevalTrainCorpusReader, SemevalTestCorpusReader
+from thesis.processors import SemevalTrainCorpusReader, SemevalTestCorpusReader
 from tqdm import tqdm
 
 

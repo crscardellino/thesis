@@ -6,7 +6,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 import argparse
 import sys
 
-from corpora.processors import AncoraCorpusReader
+from thesis.processors import AncoraCorpusReader
 from tqdm import tqdm
 
 

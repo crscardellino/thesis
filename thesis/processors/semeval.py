@@ -5,10 +5,10 @@ from __future__ import absolute_import, unicode_literals
 import itertools
 import nltk
 import sys
-from corpora.utils import find
+from thesis.utils import find
 from lxml import etree
 from nltk.stem import WordNetLemmatizer
-from corpora.processors.base import XMLCorpusReader
+from thesis.processors.base import XMLCorpusReader
 
 if sys.version_info.major == 2:  # For Python 2 use lazy map
     from itertools import imap as map

@@ -6,13 +6,13 @@ from __future__ import absolute_import, print_function, unicode_literals
 import argparse
 import sys
 
-from corpora.parsers import ColumnCorpusParser
+from thesis.parsers import ColumnCorpusParser
 from tqdm import tqdm
 
 
 def search_main_verb(sentence):
-    if sentence.verb_position.isdigit() and int(sentence.verb_position) < len(sentence):
-        word = sentence.get_word_by_index(int(sentence.verb_position))
+    if sentence.verb_position.isdigit() and sentence.verb_position < len(sentence):
+        word = sentence.get_word_by_index(sentence.verb_position)
         lemma = word.lemma.split('|')
 
         if lemma[-1] == 'main_verb':
@@ -24,7 +24,7 @@ def search_main_verb(sentence):
 
         if lemma[-1] == 'main_verb':
             word.lemma = lemma[0]
-            return int(word.idx)
+            return word.idx
 
     return -1
 

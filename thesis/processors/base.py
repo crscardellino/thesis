@@ -2,7 +2,7 @@
 
 from __future__ import absolute_import, unicode_literals
 
-from corpora.utils import find
+from thesis.utils import find
 from lxml import etree
 
 

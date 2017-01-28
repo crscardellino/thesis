@@ -7,7 +7,7 @@ import argparse
 import sh
 import sys
 
-from corpora.parsers import ColumnCorpusParser
+from thesis.parsers import ColumnCorpusParser
 from tqdm import tqdm
 
 
@@ -37,7 +37,7 @@ if __name__ == '__main__':
         parsed_sentences = sh.wget('--post-data', '%s' % tokenized_sentences, args.server, '-O', '-')
         parsed_sentences = [ps.split('\n') for ps in parsed_sentences.strip().split('\n\n')]
 
-        original_lemma_idx = int(sentence.lemma_idx)
+        original_lemma_idx = sentence.lemma_idx
 
         # FIXME: This is savage!!!
         ps_len = [len(ps) for ps in parsed_sentences]

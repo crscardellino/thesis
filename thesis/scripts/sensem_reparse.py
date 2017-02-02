@@ -15,13 +15,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('corpus',
+                        type=str,
                         help='SenSem column file path')
     parser.add_argument('--output',
+                        type=str,
                         default=None,
                         help='Output file to write (defaults to STDOUT)')
     parser.add_argument('--sentences',
+                        type=int,
                         default=24153,
                         help='Number of sentences to parse')
+    parser.add_argument('--batch_size',
+                        type=int,
+                        default=100,
+                        help='Number of sentences to batch analyze.')
     args = parser.parse_args()
 
     output = sys.stdout if args.output is None else open(args.output, 'w')
@@ -33,7 +40,9 @@ if __name__ == '__main__':
     tokenized_freeling_sentences = []
     sentences = []
 
-    for sidx, sentence in enumerate(tqdm(parser.sentences, total=args.sentences), start=1):
+    pbar = tqdm(total=args.sentences)
+
+    for sidx, sentence in enumerate(parser.sentences, start=1):
         tokenized_sentence = [word.token for word in sentence]
         tokenized_sentence = [token for widx, token in enumerate(tokenized_sentence)
                               if widx == 0 or (widx > 0 and tokenized_sentence[widx-1].lower() != token.lower())]
@@ -42,7 +51,7 @@ if __name__ == '__main__':
         tokenized_freeling_sentences.append(tokenized_sentence)
         sentences.append(sentence)
 
-        if (sidx % 100 == 0) or (sidx == args.sentences):
+        if (sidx % args.batch_size == 0) or (sidx == args.sentences):
             tokenized_freeling_sentences = '\n\n'.join(tokenized_freeling_sentences) + '\n\n'
 
             freeling_args = (
@@ -73,10 +82,13 @@ if __name__ == '__main__':
                 print(sentence.metadata_string, file=output)
                 print(printing_sentence.strip(), file=output, end='\n\n')
 
-            parsed_sentences = []
+            tokenized_freeling_sentences = []
             sentences = []
+            pbar.update(sidx)
 
     if args.output is not None:
         output.close()
+ 
+     pbar.close()
 
     print('SenSem corpus parsed', file=sys.stderr)

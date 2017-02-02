@@ -5,13 +5,15 @@ from __future__ import absolute_import, unicode_literals
 from collections import OrderedDict
 
 
-def _isfloat(item):
+def _try_number(item):
     try:
-        float(item)
+        return int(item)
     except ValueError:
-        return False
-    else:
-        return True
+        pass
+    try:
+        return float(item)
+    except ValueError:
+        return item
 
 
 class Word(object):
@@ -28,12 +30,7 @@ class Word(object):
         return item in self._extras
 
     def __getitem__(self, item):
-        if getattr(self._extras[item], 'isdigit', False):
-            return int(self._extras[item])
-        elif _isfloat(self._extras[item]):
-            return float(self._extras[item])
-        else:
-            return self._extras[item]
+        return _try_number(self._extras[item])
 
     def __getattr__(self, item):
         if item in self:
@@ -62,7 +59,7 @@ class Sentence(object):
         return item in self._metadata
 
     def __getitem__(self, item):
-        return self._metadata[item]
+        return _try_number(self._metadata[item])
 
     def __getattr__(self, item):
         if item in self:

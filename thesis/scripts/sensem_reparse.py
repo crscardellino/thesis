@@ -26,15 +26,15 @@ if __name__ == '__main__':
 
     output = sys.stdout if args.output is None else open(args.output, 'w')
 
-    parser = ColumnCorpusParser(args.corpus, 'idx', 'token', 'lemma', 'pos',
-                                'short_pos', 'morpho_info', 'nec', 'sense', 'syntax',
+    parser = ColumnCorpusParser(args.corpus, 'idx', 'token', 'lemma', 'tag',
+                                'short_tag', 'morpho_info', 'nec', 'sense', 'syntax',
                                 'dephead', 'deprel', 'coref', 'srl')
 
     for sidx, sentence in enumerate(tqdm(parser.sentences, total=args.sentences), start=1):
         tokenized_sentence = [word.token for word in sentence]
-        tokenized_sentence = [token for widx, token in enumerate(sentence)
-                              if widx == 0 or (widx > 0 and sentence[widx-1].lower() != token.lower())]
-        tokenized_sentence = '\n'.join(tokenized_sentence)
+        tokenized_sentence = [token for widx, token in enumerate(tokenized_sentence)
+                              if widx == 0 or (widx > 0 and tokenized_sentence[widx-1].lower() != token.lower())]
+        tokenized_sentence = '\n'.join(tokenized_sentence) + '\n\n'
 
         freeling_args = (
             '-f', 'es.cfg',
@@ -50,11 +50,11 @@ if __name__ == '__main__':
         parsed_sentence = sh.awk('{ print $1, $2, $3, $4, $5, $6, $7, $10, $11 }', _in=parsed_sentence)
 
         parsed_sentence = parsed_sentence.strip().split('\n')
-        parsed_sentence_lemma = parsed_sentence[sentence.verb_position].strip().split()[2]
+        parsed_sentence_lemma = parsed_sentence[sentence.verb_position-1].strip().split()[2]
 
-        if parsed_sentence_lemma != sentence.lemma:
+        if parsed_sentence_lemma != sentence.verb_lemma:
             tqdm.write('NOT FOUND LEMMA for sentence %s (%s != %s)'
-                       % (sentence.sentence_index, sentence.lemma, parsed_sentence_lemma), file=sys.stdout)
+                       % (sentence.sentence_index, sentence.verb_lemma, parsed_sentence_lemma))
             sentence['verb_position'] = '-'
 
         printing_sentence = '\n'.join(parsed_sentence)

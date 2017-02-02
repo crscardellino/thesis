@@ -15,7 +15,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('corpus',
-                        help='SenSem column file path')
+                        help='Semeval column file path')
     parser.add_argument('--output',
                         default=None,
                         help='Output file to write (defaults to STDOUT)')
@@ -65,4 +65,4 @@ if __name__ == '__main__':
     if args.output is not None:
         output.close()
 
-    print('SenSem corpus parsed', file=sys.stderr)
+    print('Semeval corpus parsed', file=sys.stderr)

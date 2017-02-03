@@ -69,12 +69,12 @@ if __name__ == '__main__':
 
             for sentence, parsed_sentence in zip(sentences, parsed_sentences.strip().split('\n\n')):
                 parsed_sentence = parsed_sentence.strip().split('\n')
-                parsed_sentence_lemma = parsed_sentence[sentence.verb_position-1].strip().split()[2]
+                parsed_sentence_lemma = parsed_sentence[sentence.main_lemma_index-1].strip().split()[2]
 
-                if parsed_sentence_lemma != sentence.verb_lemma:
+                if parsed_sentence_lemma != sentence.main_lemma:
                     tqdm.write('NOT FOUND LEMMA for sentence %s (%s != %s)'
-                               % (sentence.sentence_index, sentence.verb_lemma, parsed_sentence_lemma))
-                    sentence['verb_position'] = '-'
+                               % (sentence.sentence_index, sentence.main_lemma, parsed_sentence_lemma))
+                    sentence['main_lemma_index'] = '-'
 
                 printing_sentence = '\n'.join(parsed_sentence)
                 printing_sentence = sh.column('-t', _in=printing_sentence.strip() + '\n')
@@ -89,6 +89,6 @@ if __name__ == '__main__':
     if args.output is not None:
         output.close()
  
-     pbar.close()
+    pbar.close()
 
     print('SenSem corpus parsed', file=sys.stderr)

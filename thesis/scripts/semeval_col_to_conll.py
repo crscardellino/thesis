@@ -37,7 +37,7 @@ if __name__ == '__main__':
         parsed_sentences = sh.wget('--post-data', '%s' % tokenized_sentences, args.server, '-O', '-')
         parsed_sentences = [ps.split('\n') for ps in parsed_sentences.strip().split('\n\n')]
 
-        original_lemma_idx = sentence.lemma_idx
+        original_lemma_idx = sentence.main_lemma_index
 
         # FIXME: This is savage!!!
         ps_len = [len(ps) for ps in parsed_sentences]
@@ -46,15 +46,15 @@ if __name__ == '__main__':
         lemma_sentence = parsed_sentences[lemma_sentence_idx]
 
         if lemma_sentence_idx > 0:
-            lemma_idx = original_lemma_idx - ps_len[lemma_sentence_idx-1] - 1
+            main_lemma_index = original_lemma_idx - ps_len[lemma_sentence_idx-1] - 1
         else:
-            lemma_idx = original_lemma_idx - 1
+            main_lemma_index = original_lemma_idx - 1
 
-        if parsed_sentences[lemma_sentence_idx][lemma_idx].strip().split()[2] != sentence.lemma:
+        if parsed_sentences[lemma_sentence_idx][main_lemma_index].strip().split()[2] != sentence.main_lemma:
             tqdm.write('NOT FOUND LEMMA for sentence %s' % sentence.sentence_index, file=sys.stdout)
             printing_sentence = '\n'.join('\n'.join(ps) for ps in parsed_sentences)
         else:
-            sentence['lemma_idx'] = str(lemma_idx + 1)
+            sentence['main_lemma_index'] = str(main_lemma_index + 1)
             printing_sentence = '\n'.join(parsed_sentences[lemma_sentence_idx])
 
         printing_sentence = sh.column('-t', _in=printing_sentence.strip() + '\n')

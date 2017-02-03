@@ -56,15 +56,15 @@ class SemevalTrainCorpusReader(XMLCorpusReader):
 
             return word_lemma
 
-        lemma, lemma_pos = sentence.getparent().get('item', '-.-').split('.')
-        lemma_idx = len(sentence.find('context').text.strip().split()) + 1
+        main_lemma, lemma_tag = sentence.getparent().get('item', '-.-').split('.')
+        main_lemma_index = len(sentence.find('context').text.strip().split()) + 1
 
         metadata = dict(
-            lemma=lemma,
-            lemma_pos=lemma_pos,
-            lemma_idx='%d' % lemma_idx,  # FIXME: A better way to do this?
+            main_lemma=main_lemma,
+            lemma_tag=lemma_tag,
+            main_lemma_index='%d' % main_lemma_index,  # FIXME: A better way to do this?
             sense=sentence.find('answer').get('senseid', '-') if sentence.find('answer') is not None else '-',
-            sentence=sentence.get('id', '-'),
+            resource_sentence=sentence.get('id', '-'),
             doc=sentence.get('docsrc', '-'),
         )
 
@@ -101,10 +101,10 @@ class SemevalTestCorpusReader(SemevalTrainCorpusReader):
         self._test_results = {}
         with open(next(find(self._path, self._key_file)), 'r') as f:
             for line in f:
-                lemma, sentenceid, sense = line.strip().split()
-                lemma, lemma_pos = lemma.split('.')
+                main_lemma, sentenceid, sense = line.strip().split()
+                main_lemma, lemma_tag = main_lemma.split('.')
 
-                self._test_results[(lemma, lemma_pos, sentenceid)] = sense
+                self._test_results[(main_lemma, lemma_tag, sentenceid)] = sense
 
     @property
     def sentences(self):
@@ -114,8 +114,8 @@ class SemevalTestCorpusReader(SemevalTrainCorpusReader):
         metadata, words = self.parsed(sentence)
         metadata = dict(metadata)
 
-        lemma, lemma_pos = sentence.getparent().get('item', '-.-').split('.')
+        main_lemma, lemma_tag = sentence.getparent().get('item', '-.-').split('.')
         sentenceid = sentence.get('id')
-        metadata['sense'] = self._test_results[(lemma, lemma_pos, sentenceid)]
+        metadata['sense'] = self._test_results[(main_lemma, lemma_tag, sentenceid)]
 
         return sorted(metadata.items()), words

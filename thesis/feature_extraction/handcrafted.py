@@ -35,7 +35,7 @@ class HandcraftedFeaturesExtractor(object):
         # Features of the word the main word depends (head of the relation)
         self._outbound_dep_triple = features.pop('outbound_dep_triple', True)
 
-    def featurize_sentence(self, sentence, main_word_index):
+    def featurize_sentence(self, sentence):
         """
         Takes a sentence and creates a feature dictionary
         :type sentence: corpora.parsers.Sentence
@@ -45,7 +45,7 @@ class HandcraftedFeaturesExtractor(object):
         features_dict = defaultdict(int)
 
         # Main word features
-        main_word = sentence.get_word_by_index(main_word_index)
+        main_word = sentence.get_word_by_index(sentence.main_lemma_index)
 
         if self._main_token:
             features_dict['main_token'] = main_word.token
@@ -125,13 +125,13 @@ class HandcraftedHashedFeaturesExtractor(HandcraftedFeaturesExtractor):
         super(HandcraftedHashedFeaturesExtractor, self).__init__(**features)
         self._hasher = FeatureHasher(n_features=n_features, dtype=dtype, non_negative=non_negative)
 
-    def featurize_sentence(self, sentence, main_word_index):
+    def featurize_sentence(self, sentence):
         """
         Takes a sentence and creates a feature vector using the FeautureHasher
         :type sentence: corpora.parsers.Sentence
         :type main_word_index: int
         :return: Vector representing the sentence
         """
-        features_dict = super(HandcraftedHashedFeaturesExtractor, self).featurize_sentence(sentence, main_word_index)
+        features_dict = super(HandcraftedHashedFeaturesExtractor, self).featurize_sentence(sentence)
 
         return self._hasher.transform([features_dict])

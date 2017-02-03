@@ -40,7 +40,7 @@ if __name__ == '__main__':
             word = wrd.token
             word += '\t%s' % wrd.lemma
 
-            if sentence.verb_position == str(wrd.idx):
+            if sentence.main_lemma_index == str(wrd.idx):
                 word += '|main_verb'
 
             word += '\t%s' % wrd.tag

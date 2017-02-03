@@ -11,8 +11,8 @@ from tqdm import tqdm
 
 
 def search_main_verb(sentence):
-    if sentence.verb_position.isdigit() and sentence.verb_position < len(sentence):
-        word = sentence.get_word_by_index(sentence.verb_position)
+    if sentence.main_lemma_index.isdigit() and sentence.main_lemma_index < len(sentence):
+        word = sentence.get_word_by_index(sentence.main_lemma_index)
         lemma = word.lemma.split('|')
 
         if lemma[-1] == 'main_verb':
@@ -59,8 +59,8 @@ if __name__ == '__main__':
                       file=flog)
             elif main_verb_index > 0:
                 print('CHANGE: Main verb changed from position %s to position %d in sentence %s' %
-                      (sentence.verb_position, main_verb_index, sentence.sentence_index), file=flog)
-                sentence['verb_position'] = str(main_verb_index)
+                      (sentence.main_lemma_index, main_verb_index, sentence.sentence_index), file=flog)
+                sentence['main_lemma_index'] = str(main_verb_index)
             else:
                 print('NOT_FOUND: Main verb position wasn\'t found for sentence %s' % sentence.sentence_index,
                       file=flog)

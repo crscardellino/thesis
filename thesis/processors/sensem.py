@@ -44,12 +44,12 @@ class SenSemCorpusReader(XMLCorpusReader):
 
     @staticmethod
     def parsed(sentence):
-        verb_lemma = sentence.get('lema_verbo', '-')
+        main_lemma = sentence.get('lema_verbo', '-')
 
         metadata = dict(
-            verb_lemma=verb_lemma,
-            sensem_sense=sentence.get('sentido', '-'),
-            sensem_sentence=sentence.get('id', '-'),
+            main_lemma=main_lemma,
+            sense=sentence.get('sentido', '-'),
+            resource_sentence=sentence.get('id', '-'),
             wn=sentence.get('WN_S', '-'),
             wn16=sentence.get('WN16_S', '-'),
             wn30=sentence.get('WN30_S', '-')
@@ -63,19 +63,19 @@ class SenSemCorpusReader(XMLCorpusReader):
         xpath_attribute_query += "contains('%s', concat('|', @id, '|'))" % verb_positions
 
         verb_candidates = [v for v in sentence.xpath('.//w[%s]' % xpath_attribute_query)
-                           if v.get('lema') == verb_lemma]
+                           if v.get('lema') == main_lemma]
 
-        metadata['verb_position'] = verb_candidates[0].get('id') if len(verb_candidates) > 0 else '-'
+        metadata['main_lemma_index'] = verb_candidates[0].get('id') if len(verb_candidates) > 0 else '-'
 
         # If the verb is not where it should be we follow different ways to obtain it
-        if metadata['verb_position'] is '-':
-            verb_candidates = [v for v in sentence.xpath(".//w[@lema='%s']" % verb_lemma)]
+        if metadata['main_lemma_index'] is '-':
+            verb_candidates = [v for v in sentence.xpath(".//w[@lema='%s']" % main_lemma)]
 
             if len(verb_candidates) == 1:
-                metadata['verb_position'] = verb_candidates[0].get('id')
+                metadata['main_lemma_index'] = verb_candidates[0].get('id')
             elif len(verb_candidates) == 0 or sentence.get('verbo') is None:
                 # FIXME: There is no real information on how to look for the verb. We give up.
-                metadata['verb_position'] = '-'
+                metadata['main_lemma_index'] = '-'
             else:
                 verb_positions = [int(v) for v in sentence.get('verbo', '').split(',')]
                 verb_candidates = [v for v in verb_candidates
@@ -84,10 +84,10 @@ class SenSemCorpusReader(XMLCorpusReader):
                                                              verb_positions[-1])]
 
                 if len(verb_candidates) == 1:
-                    metadata['verb_position'] = verb_candidates[0].get('id')
+                    metadata['main_lemma_index'] = verb_candidates[0].get('id')
                 else:
                     # FIXME: The verb is among a possibility of examples. Take them all.
-                    metadata['verb_position'] = ','.join([v.get('id') for v in verb_candidates])
+                    metadata['main_lemma_index'] = ','.join([v.get('id') for v in verb_candidates])
 
         words = [
             (word.get('id'),

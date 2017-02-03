@@ -29,6 +29,10 @@ if __name__ == '__main__':
                         type=int,
                         default=100,
                         help='Number of sentences to batch analyze.')
+    parser.add_argument('--sentence_start',
+                        type=int,
+                        default=0,
+                        help='Ignore all sentences previous to this one and start from here')
     args = parser.parse_args()
 
     output = sys.stdout if args.output is None else open(args.output, 'w')
@@ -40,9 +44,9 @@ if __name__ == '__main__':
     tokenized_freeling_sentences = []
     sentences = []
 
-    pbar = tqdm(total=args.sentences)
-
-    for sidx, sentence in enumerate(parser.sentences, start=1):
+    for sidx, sentence in enumerate(tqdm(parser.sentences, total=args.sentences), start=1):
+        if sidx < args.sentence_start:
+            continue
         tokenized_sentence = [word.token for word in sentence]
         tokenized_sentence = [token for widx, token in enumerate(tokenized_sentence)
                               if widx == 0 or (widx > 0 and tokenized_sentence[widx-1].lower() != token.lower())]
@@ -70,11 +74,15 @@ if __name__ == '__main__':
 
             for sentence, parsed_sentence in zip(sentences, parsed_sentences.strip().split('\n\n')):
                 parsed_sentence = parsed_sentence.strip().split('\n')
-                parsed_sentence_lemma = parsed_sentence[sentence.main_lemma_index-1].strip().split()[2]
+                try:
+                    parsed_sentence_lemma = parsed_sentence[sentence.main_lemma_index-1].strip().split()[2]
+                except IndexError:
+                    parsed_sentence_lemma = 'OUT_OF_BOUNDS'
 
                 if parsed_sentence_lemma != sentence.main_lemma:
                     tqdm.write('NOT FOUND LEMMA for sentence %s (%s != %s)'
-                               % (sentence.sentence_index, sentence.main_lemma, parsed_sentence_lemma))
+                               % (sentence.sentence_index, sentence.main_lemma, parsed_sentence_lemma),
+                               file=sys.stdout)
                     sentence['main_lemma_index'] = '-'
 
                 printing_sentence = '\n'.join(parsed_sentence)
@@ -85,11 +93,8 @@ if __name__ == '__main__':
 
             tokenized_freeling_sentences = []
             sentences = []
-            pbar.update(sidx)
 
     if args.output is not None:
         output.close()
- 
-    pbar.close()
 
     print('SenSem corpus parsed', file=sys.stderr)

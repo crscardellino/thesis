@@ -39,13 +39,13 @@ class HandcraftedFeaturesExtractor(object):
         """
         Takes a sentence and creates a feature dictionary
         :type sentence: corpora.parsers.Sentence
-        :type main_word_index: int
         :return: Dictionary of features
         """
         features_dict = defaultdict(int)
 
         # Main word features
-        main_word = sentence.get_word_by_index(sentence.main_lemma_index)
+        main_lemma_index = sentence.main_lemma_index
+        main_word = sentence.get_word_by_index(main_lemma_index)
 
         if self._main_token:
             features_dict['main_token'] = main_word.token
@@ -58,16 +58,16 @@ class HandcraftedFeaturesExtractor(object):
                 features_dict['morpho:%s' % info] = value
 
         if self._window_size > 0:
-            leftest_word_index = max(main_word_index - self._window_size, 1)
-            rightest_word_index = min(main_word_index + self._window_size, len(sentence) + 1)
+            leftest_word_index = max(main_lemma_index - self._window_size, 1)
+            rightest_word_index = min(main_lemma_index + self._window_size, len(sentence) + 1)
 
-            for window_word_index in chain(range(leftest_word_index, main_word_index),
-                                           range(main_word_index+1, rightest_word_index)):
+            for window_word_index in chain(range(leftest_word_index, main_lemma_index),
+                                           range(main_lemma_index+1, rightest_word_index)):
                 window_word = sentence.get_word_by_index(window_word_index)
                 if self._window_bow:
                     features_dict['bow:%s' % window_word.token] += 1
 
-                relative_position = window_word_index - main_word_index
+                relative_position = window_word_index - main_lemma_index
 
                 if self._window_tokens:
                     features_dict['token%+d' % relative_position] = window_word.token
@@ -78,30 +78,30 @@ class HandcraftedFeaturesExtractor(object):
                 if self._window_tags:
                     features_dict['tag%+d' % relative_position] = window_word.tag
 
-        if self._surrounding_bigrams and main_word_index > 2:
+        if self._surrounding_bigrams and main_lemma_index > 2:
             features_dict['left_bigram'] = '%s %s' % (
-                sentence.get_word_by_index(main_word_index-2).token,
-                sentence.get_word_by_index(main_word_index-1).token
+                sentence.get_word_by_index(main_lemma_index-2).token,
+                sentence.get_word_by_index(main_lemma_index-1).token
             )
 
-        if self._surrounding_bigrams and main_word_index <= len(sentence) - 2:
+        if self._surrounding_bigrams and main_lemma_index <= len(sentence) - 2:
             features_dict['right_bigram'] = '%s %s' % (
-                sentence.get_word_by_index(main_word_index+1).token,
-                sentence.get_word_by_index(main_word_index+2).token
+                sentence.get_word_by_index(main_lemma_index+1).token,
+                sentence.get_word_by_index(main_lemma_index+2).token
             )
 
-        if self._surrounding_trigrams and main_word_index > 3:
+        if self._surrounding_trigrams and main_lemma_index > 3:
             features_dict['left_trigram'] = '%s %s %s' % (
-                sentence.get_word_by_index(main_word_index-3).token,
-                sentence.get_word_by_index(main_word_index-2).token,
-                sentence.get_word_by_index(main_word_index-1).token
+                sentence.get_word_by_index(main_lemma_index-3).token,
+                sentence.get_word_by_index(main_lemma_index-2).token,
+                sentence.get_word_by_index(main_lemma_index-1).token
             )
 
-        if self._surrounding_trigrams and main_word_index <= len(sentence) - 3:
+        if self._surrounding_trigrams and main_lemma_index <= len(sentence) - 3:
             features_dict['right_trigram'] = '%s %s %s' % (
-                sentence.get_word_by_index(main_word_index+1).token,
-                sentence.get_word_by_index(main_word_index+2).token,
-                sentence.get_word_by_index(main_word_index+3).token
+                sentence.get_word_by_index(main_lemma_index+1).token,
+                sentence.get_word_by_index(main_lemma_index+2).token,
+                sentence.get_word_by_index(main_lemma_index+3).token
             )
 
         if self._inbound_dep_triples:
@@ -129,7 +129,6 @@ class HandcraftedHashedFeaturesExtractor(HandcraftedFeaturesExtractor):
         """
         Takes a sentence and creates a feature vector using the FeautureHasher
         :type sentence: corpora.parsers.Sentence
-        :type main_word_index: int
         :return: Vector representing the sentence
         """
         features_dict = super(HandcraftedHashedFeaturesExtractor, self).featurize_sentence(sentence)

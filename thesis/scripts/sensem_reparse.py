@@ -65,7 +65,7 @@ if __name__ == '__main__':
             )
 
             parsed_sentences = sh.analyze(*freeling_args, _in=tokenized_freeling_sentences)
-            parsed_sentences = sh.awk('{ print $1, $2, $3, $4, $5, $6, $7, $10, $11 }', _in=parsed_sentences)
+            parsed_sentences = sh.awk('/^\s*$/ { print } { print $1, $2, $3, $4, $5, $6, $7, $10, $11 }', _in=parsed_sentences)
 
             for sentence, parsed_sentence in zip(sentences, parsed_sentences.strip().split('\n\n')):
                 parsed_sentence = parsed_sentence.strip().split('\n')

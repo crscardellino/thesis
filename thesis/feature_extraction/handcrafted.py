@@ -53,8 +53,8 @@ class HandcraftedFeaturesExtractor(object):
             features_dict['main_lemma'] = main_word.lemma
         if self._main_tag:
             features_dict['main_tag'] = main_word.tag
-        if self._main_morpho:
-            for info, value in (info.split('=') for info in getattr(main_word, 'morpho_info', [])):
+        if self._main_morpho and hasattr(main_word, 'morpho_info'):
+            for info, value in (info.split('=') for info in main_word.morpho_info.split('|')):
                 features_dict['morpho:%s' % info] = value
 
         if self._window_size > 0:

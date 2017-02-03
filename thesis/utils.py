@@ -17,3 +17,14 @@ def find(path, pattern):
     for root, _, filenames in os.walk(path):
         for filename in fnmatch.filter(filenames, pattern):
             yield os.path.join(root, filename)
+
+
+def try_number(item):
+    try:
+        return int(item)
+    except ValueError:
+        pass
+    try:
+        return float(item)
+    except ValueError:
+        return item

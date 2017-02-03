@@ -3,17 +3,7 @@
 from __future__ import absolute_import, unicode_literals
 
 from collections import OrderedDict
-
-
-def _try_number(item):
-    try:
-        return int(item)
-    except ValueError:
-        pass
-    try:
-        return float(item)
-    except ValueError:
-        return item
+from thesis.utils import try_number
 
 
 class Word(object):
@@ -30,7 +20,7 @@ class Word(object):
         return item in self._extras
 
     def __getitem__(self, item):
-        return _try_number(self._extras[item])
+        return try_number(self._extras[item])
 
     def __getattr__(self, item):
         if item in self:
@@ -59,7 +49,7 @@ class Sentence(object):
         return item in self._metadata
 
     def __getitem__(self, item):
-        return _try_number(self._metadata[item])
+        return try_number(self._metadata[item])
 
     def __getattr__(self, item):
         if item in self:

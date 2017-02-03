@@ -111,8 +111,8 @@ class HandcraftedFeaturesExtractor(object):
                 features_dict['dep:%s:%s:%s' % (word.token, word.dep_rel, main_word.token)] += 1
 
         if self._outbound_dep_triple:
-            if main_word.dep_rel == 'top':
-                features_dict['dep:%s:top' % main_word.token] += 1
+            if main_word.dep_head == 0:
+                features_dict['dep:%s:%s' % (main_word.token, main_word.dep_rel)] += 1
             elif main_word.dep_rel not in _NOT_VALID_DEP_RELATIONS:
                 dep_word = sentence.get_word_by_index(main_word.dep_head)
                 features_dict['dep:%s:%s:%s' % (main_word.token, main_word.dep_rel, dep_word.token)] += 1

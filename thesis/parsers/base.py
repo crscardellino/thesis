@@ -3,6 +3,7 @@
 from __future__ import absolute_import, unicode_literals
 
 from collections import OrderedDict
+from tabulate import tabulate
 from thesis.utils import try_number
 
 
@@ -36,6 +37,10 @@ class Word(object):
 
     def __str__(self):
         return '%s\t%s\t%s\t%s\t%s' % (self.idx, self.token, self.lemma, self.tag, '\t'.join(self._extras.values()))
+
+    @property
+    def extras(self):
+        return list(self._extras.values())
 
 
 class Sentence(object):
@@ -71,13 +76,14 @@ class Sentence(object):
         return '<Sentence: %05d - Corpus: %s>' % (self._sentence_index, self._corpus_name)
 
     def __str__(self):
-        return '\n'.join(str(word) for word in self)
+        words = [[word.idx, word.token, word.lemma, word.tag] + word.extras for word in self]
+        return tabulate(words, tablefmt='plain')
 
     @property
     def metadata_string(self):
-        return 'META:%s\tsentence:%05d\t%s' % \
+        return 'META:%s    sentence:%05d    %s' % \
                (self._corpus_name, self._sentence_index,
-                '\t'.join(':'.join(d) for d in sorted(self._metadata.items())))
+                '    '.join(':'.join(d) for d in sorted(self._metadata.items())))
 
     def get_word_by_index(self, index):
         index = int(index)

@@ -116,7 +116,7 @@ if __name__ == '__main__':
     print('Saving resources in directory %s' % args.save_path, file=sys.stderr)
 
     # The train classes define the rest of the labels
-    train_classes = {lbl: idx for idx, lbl in enumerate(labels['train'])}
+    train_classes = {lbl: idx for idx, lbl in enumerate(np.unique(labels['train']))}
 
     for corpus in instances:
         if args.hashing:

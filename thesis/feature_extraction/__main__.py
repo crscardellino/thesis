@@ -96,6 +96,7 @@ if __name__ == '__main__':
     instances = defaultdict(list)
     labels = defaultdict(list)
     sentences_id = defaultdict(list)
+    corpus_lemmas = defaultdict(list)
 
     print('Getting instances', file=sys.stderr)
 
@@ -110,6 +111,7 @@ if __name__ == '__main__':
         instances[corpus].append(extractor.featurize_sentence(sentence))
         labels[corpus].append(label)
         sentences_id[corpus].append(sentence.sentence_index)
+        corpus_lemmas[corpus].append(sentence.main_lemma)
 
     print('Saving resources in directory %s' % args.save_path, file=sys.stderr)
 
@@ -123,12 +125,11 @@ if __name__ == '__main__':
             vectorizer = DictVectorizer()
             matrix = vectorizer.fit_transform(instances[corpus])
 
-        classes = np.unique(labels[corpus])
         target = np.array([train_classes.get(lbl, -1) for lbl in labels[corpus]])
         sentences = np.array(sentences_id[corpus])
+        lemmas = np.array(corpus_lemmas[corpus])
         np.savez_compressed(os.path.join(args.save_path, '%s_dataset.npz' % corpus),
                             data=matrix.data, indices=matrix.indices, indptr=matrix.indptr, shape=matrix.shape,
-                            target=target, classes=sorted(train_classes), corpus_classes=classes,
-                            sentences=sentences)
+                            target=target, train_classes=sorted(train_classes), sentences=sentences, lemmas=lemmas)
 
     print('Finished', file=sys.stderr)

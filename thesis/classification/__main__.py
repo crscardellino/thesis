@@ -7,6 +7,7 @@ import json
 import numpy as np
 import pandas as pd
 import sys
+import tensorflow as tf
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import MultinomialNB
@@ -84,20 +85,23 @@ if __name__ == '__main__':
     print('Training models and getting results', file=sys.stderr)
     for lemma, data, target in tqdm(datasets.train_dataset.traverse_dataset_by_lemma(),
                                     total=datasets.train_dataset.num_lemmas):
-        model = _CLASSIFIERS[args.classifier](**config)
-        try:
-            model.fit(data, target)
-        except ValueError:  # Some classifiers cannot handle the case where the class is only one
-            test_target = datasets.test_dataset.target(lemma)
-            test_results = pd.DataFrame(np.vstack([test_target, test_target]).T,
-                                        columns=['true', 'prediction'])
-        else:
-            test_data = datasets.test_dataset.data(lemma)
-            test_target = datasets.test_dataset.target(lemma)
-            test_results = pd.DataFrame(np.vstack([test_target, model.predict(test_data)]).T,
-                                        columns=['true', 'prediction'])
-        test_results.insert(0, 'lemma', lemma)
-        results.append(test_results)
+        with tf.Graph().as_default() as g:  # To avoid resource exhaustion
+            model = _CLASSIFIERS[args.classifier](**config)
+            try:
+                model.fit(data, target)
+            except ValueError:  # Some classifiers cannot handle the case where the class is only one
+                test_target = datasets.test_dataset.target(lemma)
+                test_results = pd.DataFrame(np.vstack([test_target, test_target]).T,
+                                            columns=['true', 'prediction'])
+            else:
+                test_data = datasets.test_dataset.data(lemma)
+                test_target = datasets.test_dataset.target(lemma)
+                test_results = pd.DataFrame(np.vstack([test_target, model.predict(test_data)]).T,
+                                            columns=['true', 'prediction'])
+            test_results.insert(0, 'lemma', lemma)
+            results.append(test_results)
+        del model
+        del g
 
     print('Saving results to %s' % args.results_path, file=sys.stderr)
     pd.concat(results, ignore_index=True).to_csv(args.results_path, index=False)

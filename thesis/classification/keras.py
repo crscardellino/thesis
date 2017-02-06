@@ -13,7 +13,7 @@ from keras.utils.np_utils import to_categorical
 class KerasMultilayerPerceptron(object):
     def __init__(self, layers=list(), layers_activation='tanh', classification_layer_activation='softmax',
                  layers_initialization='uniform', dropout_layers=None, optimizer='adam',
-                 loss='categorical_crossentropy', epochs=100, batch_size=64, metrics=None, l1=0.01, l2=0.01):
+                 loss='categorical_crossentropy', epochs=100, batch_size=50, metrics=None, l1=0.01, l2=0.01):
         self._layers = layers
         self._layers_activation = layers_activation
         self._classification_layer_activation = classification_layer_activation
@@ -65,12 +65,12 @@ class KerasMultilayerPerceptron(object):
         self._classes = np.unique(y)
         self._build_network(x.shape[1], len(self._classes))
 
-        if self._epochs is None and self._batch_size is None:
+        if self._epochs < 0 and self._batch_size < 0:
             self._epochs = 100
             self._batch_size = np.int(np.ceil(x.shape[0] / self._epochs))
-        elif self._epochs is None:
+        elif self._epochs < 0:
             self._epochs = np.int(np.ceil(x.shape[0] / self._batch_size))
-        elif self._batch_size is None:
+        elif self._batch_size < 0:
             self._batch_size = np.int(np.ceil(x.shape[0] / self._epochs))
 
         return self._model.fit(x, to_categorical(np.searchsorted(self._classes, y)),

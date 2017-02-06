@@ -91,7 +91,8 @@ if __name__ == '__main__':
                 model.fit(data, target)
             except ValueError:  # Some classifiers cannot handle the case where the class is only one
                 test_target = datasets.test_dataset.target(lemma)
-                test_results = pd.DataFrame(np.vstack([test_target, test_target]).T,
+                predicted_target = np.ones(test_target.shape) * target[0]
+                test_results = pd.DataFrame(np.vstack([test_target, predicted_target]).T,
                                             columns=['true', 'prediction'])
             else:
                 test_data = datasets.test_dataset.data(lemma)

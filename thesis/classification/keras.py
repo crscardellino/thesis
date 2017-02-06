@@ -8,6 +8,7 @@ from keras.models import Sequential
 from keras.layers import Dense, Dropout
 from keras.regularizers import l1, l2, l1l2
 from keras.utils.np_utils import to_categorical
+from scipy.sparse import issparse
 
 
 class KerasMultilayerPerceptron(object):
@@ -74,6 +75,8 @@ class KerasMultilayerPerceptron(object):
             self._epochs = np.int(np.ceil(x.shape[0] / self._batch_size))
         elif self._batch_size < 0:
             self._batch_size = np.int(np.ceil(x.shape[0] / self._epochs))
+
+        x = x.toarray() if issparse(x) else x
 
         return self._model.fit(x, to_categorical(np.searchsorted(self._classes, y)),
                                nb_epoch=self._epochs, batch_size=self._batch_size, verbose=0)

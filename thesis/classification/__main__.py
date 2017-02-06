@@ -8,9 +8,11 @@ import numpy as np
 import pandas as pd
 import sys
 
+from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier
+from thesis.classification import KerasMultilayerPerceptron
 from thesis.dataset import SenseCorpusDatasets
 from thesis.utils import try_number
 from tqdm import tqdm
@@ -18,6 +20,8 @@ from tqdm import tqdm
 
 _CLASSIFIERS = {
     'decision_tree': DecisionTreeClassifier,
+    'log': LogisticRegression,
+    'mlp': KerasMultilayerPerceptron,
     'naive_bayes': MultinomialNB,
     'svm': LinearSVC
 }
@@ -48,6 +52,11 @@ if __name__ == '__main__':
                         default=list(),
                         nargs='+',
                         help='Classifier manual configuration (will override the config file).')
+    parser.add_argument('--layers',
+                        type=int,
+                        nargs='+',
+                        default=list(),
+                        help='Layers for multilayer perceptron.')
 
     args = parser.parse_args()
 
@@ -63,6 +72,9 @@ if __name__ == '__main__':
 
     for key, value in args.classifier_config:
         config[key] = try_number(value)
+
+    if args.layers:
+        config['layers'] = [args.layers] if isinstance(args.layers, int) else args.layers
 
     print('Loading data', file=sys.stderr)
     datasets = SenseCorpusDatasets(args.train_dataset, args.test_dataset)

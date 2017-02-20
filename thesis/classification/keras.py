@@ -87,6 +87,7 @@ class KerasMultilayerPerceptron(object):
         """
         assert self._model is not None, "The model needs to be trained"
 
+        x = x.toarray() if issparse(x) else x
         predicted_classes = self._model.predict_classes(x, batch_size=self._batch_size, verbose=0)
 
         return self._classes[predicted_classes]
@@ -97,4 +98,5 @@ class KerasMultilayerPerceptron(object):
         """
         assert self._model is not None, "The model needs to be trained"
 
+        x = x.toarray() if issparse(x) else x
         return self._model.predict(x, verbose=0)

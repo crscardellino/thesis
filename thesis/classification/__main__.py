@@ -67,6 +67,7 @@ if __name__ == '__main__':
                         default=list(),
                         help='Layers for multilayer perceptron.')
     parser.add_argument('--max_features',
+                        type=int,
                         default=0,
                         help='Max features to train the classifier with (needs a feature selection method).')
     parser.add_argument('--feature_selection',
@@ -101,11 +102,13 @@ if __name__ == '__main__':
                                     total=datasets.train_dataset.num_lemmas):
         with tf.Graph().as_default() as g:  # To avoid resource exhaustion
             model = _CLASSIFIERS[args.classifier](**config)
+            selector = SelectKBest(_FEATURE_SELECTION[args.feature_selection], k=args.max_features)
+
+            if 0 < args.max_features < datasets.train_dataset.input_vector_size():
+                selector.fit(data, target)
+                data = selector.transform(data)
 
             try:
-                if 0 < args.max_features < datasets.train_dataset.input_vector_size():
-                    data = SelectKBest(args.feature_selection, k=args.max_features).fit_transform(data, target)
-
                 model.fit(data, target)
             except ValueError:  # Some classifiers cannot handle the case where the class is only one
                 test_target = datasets.test_dataset.target(lemma)
@@ -115,6 +118,10 @@ if __name__ == '__main__':
             else:
                 test_data = datasets.test_dataset.data(lemma)
                 test_target = datasets.test_dataset.target(lemma)
+
+                if 0 < args.max_features < datasets.train_dataset.input_vector_size():
+                    test_data = selector.transform(test_data)
+
                 test_results = pd.DataFrame(np.vstack([test_target, model.predict(test_data)]).T,
                                             columns=['true', 'prediction'])
             test_results.insert(0, 'lemma', lemma)

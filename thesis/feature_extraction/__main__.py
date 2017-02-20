@@ -97,6 +97,7 @@ if __name__ == '__main__':
     labels = defaultdict(list)
     sentences_id = defaultdict(list)
     corpus_lemmas = defaultdict(list)
+    vectorizer = DictVectorizer()
 
     print('Getting instances', file=sys.stderr)
 
@@ -104,14 +105,17 @@ if __name__ == '__main__':
         if sentence.corpus == 'filtered':
             continue
 
-        main_lemma_tag = getattr(sentence, 'lemma_tag', 'v')
-        corpus = 'nonverb.%s' % sentence.corpus if main_lemma_tag != 'v' else sentence.corpus
-        label = '%s.%s' % (sentence.main_lemma, sentence.sense)
+        label = '%s.%s.%s' % (getattr(sentence, 'lemma_tag', 'v'), sentence.main_lemma, sentence.sense)
+        corpus = 'nonverb.%s' % sentence.corpus if not label.startswith('v') else sentence.corpus
 
         instances[corpus].append(extractor.featurize_sentence(sentence))
         labels[corpus].append(label)
         sentences_id[corpus].append(sentence.sentence_index)
         corpus_lemmas[corpus].append(sentence.main_lemma)
+
+    if not args.hashing:
+        print('Vectorizing features', file=sys.stderr)
+        vectorizer.fit(instances['train'] + instances['test'])
 
     print('Saving resources in directory %s' % args.save_path, file=sys.stderr)
 
@@ -122,8 +126,7 @@ if __name__ == '__main__':
         if args.hashing:
             matrix = vstack(instances[corpus])
         else:
-            vectorizer = DictVectorizer()
-            matrix = vectorizer.fit_transform(instances[corpus])
+            matrix = vectorizer.transform(instances[corpus])
 
         target = np.array([train_classes.get(lbl, -1) for lbl in labels[corpus]])
         sentences = np.array(sentences_id[corpus])

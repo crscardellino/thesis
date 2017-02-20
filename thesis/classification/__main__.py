@@ -110,22 +110,30 @@ if __name__ == '__main__':
 
             try:
                 model.fit(data, target)
-            except ValueError:  # Some classifiers cannot handle the case where the class is only one
-                test_target = datasets.test_dataset.target(lemma)
-                predicted_target = np.ones(test_target.shape) * target[0]
-                test_results = pd.DataFrame(np.vstack([test_target, predicted_target]).T,
-                                            columns=['true', 'prediction'])
-            else:
-                test_data = datasets.test_dataset.data(lemma)
-                test_target = datasets.test_dataset.target(lemma)
+            except ValueError:
+                # Some classifiers cannot handle the case where the class is only one
+                # In that case we use the baseline of most frequent class
+                model = BaselineClassifier()
+                model.fit(data, target)
 
-                if 0 < args.max_features < datasets.train_dataset.input_vector_size():
-                    test_data = selector.transform(test_data)
+            train_results = pd.DataFrame(np.vstack([target, model.predict(data)]).T,
+                                         columns=['true', 'prediction'])
+            train_results.insert(0, 'corpus', 'train')
 
-                test_results = pd.DataFrame(np.vstack([test_target, model.predict(test_data)]).T,
-                                            columns=['true', 'prediction'])
-            test_results.insert(0, 'lemma', lemma)
-            results.append(test_results)
+            test_data = datasets.test_dataset.data(lemma)
+            test_target = datasets.test_dataset.target(lemma)
+
+            if 0 < args.max_features < datasets.train_dataset.input_vector_size():
+                test_data = selector.transform(test_data)
+
+            test_results = pd.DataFrame(np.vstack([test_target, model.predict(test_data)]).T,
+                                        columns=['true', 'prediction'])
+            test_results.insert(0, 'corpus', 'test')
+
+            all_results = pd.concat([train_results, test_results], ignore_index=True)
+            all_results.insert(0, 'lemma', lemma)
+
+            results.append(all_results)
         del model
         del g
 

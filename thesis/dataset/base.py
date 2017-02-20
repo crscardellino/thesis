@@ -44,7 +44,7 @@ class SenseCorpusDataset(object):
         if lemma is None:
             return self._train_classes.shape[0]
         else:
-            return np.array([cls for cls in self._train_classes if cls.startswith(lemma)]).shape[0]
+            return np.array([cls for cls in self._train_classes if lemma == cls.split('.')[1]]).shape[0]
 
     def num_examples(self, lemma=None):
         return self.data(lemma).shape[0]

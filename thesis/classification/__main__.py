@@ -8,7 +8,9 @@ import numpy as np
 import pandas as pd
 import sys
 import tensorflow as tf
+import warnings
 
+from keras import backend as K
 from sklearn.feature_selection import SelectKBest, chi2, f_classif, mutual_info_classif
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import MultinomialNB
@@ -18,6 +20,10 @@ from thesis.classification import BaselineClassifier, KerasMultilayerPerceptron
 from thesis.dataset import SenseCorpusDatasets
 from thesis.utils import try_number
 from tqdm import tqdm
+
+# Set logging
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
 
 
 _CLASSIFIERS = {
@@ -100,7 +106,9 @@ if __name__ == '__main__':
     print('Training models and getting results', file=sys.stderr)
     for lemma, data, target in tqdm(datasets.train_dataset.traverse_dataset_by_lemma(),
                                     total=datasets.train_dataset.num_lemmas):
-        with tf.Graph().as_default() as g:  # To avoid resource exhaustion
+        tf.reset_default_graph()
+        with tf.Session() as sess:
+            K.set_session(sess)
             model = _CLASSIFIERS[args.classifier](**config)
             selector = SelectKBest(_FEATURE_SELECTION[args.feature_selection], k=args.max_features)
 
@@ -113,6 +121,8 @@ if __name__ == '__main__':
             except ValueError:
                 # Some classifiers cannot handle the case where the class is only one
                 # In that case we use the baseline of most frequent class
+                if np.unique(target).shape[0] != 1:
+                    raise
                 model = BaselineClassifier()
                 model.fit(data, target)
 
@@ -134,8 +144,6 @@ if __name__ == '__main__':
             all_results.insert(0, 'lemma', lemma)
 
             results.append(all_results)
-        del model
-        del g
 
     print('Saving results to %s' % args.results_path, file=sys.stderr)
     pd.concat(results, ignore_index=True).to_csv(args.results_path, index=False)

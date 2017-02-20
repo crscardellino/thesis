@@ -13,13 +13,14 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier
-from thesis.classification import KerasMultilayerPerceptron
+from thesis.classification import BaselineClassifier, KerasMultilayerPerceptron
 from thesis.dataset import SenseCorpusDatasets
 from thesis.utils import try_number
 from tqdm import tqdm
 
 
 _CLASSIFIERS = {
+    'baseline': BaselineClassifier,
     'decision_tree': DecisionTreeClassifier,
     'log': LogisticRegression,
     'mlp': KerasMultilayerPerceptron,

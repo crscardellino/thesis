@@ -40,6 +40,7 @@ do
             $directory/test_dataset.npz \
             ../results/mlp_${dataset}_${layer// /_}.csv \
             --classifier mlp \
-            --max_features 10000
+            --max_features 10000 \
+            --layers $(echo -n $layer)
     done
 done

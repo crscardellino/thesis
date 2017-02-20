@@ -9,6 +9,7 @@ import pandas as pd
 import sys
 import tensorflow as tf
 
+from sklearn.feature_selection import SelectKBest, chi2, f_classif, mutual_info_classif
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.svm import LinearSVC
@@ -26,6 +27,12 @@ _CLASSIFIERS = {
     'mlp': KerasMultilayerPerceptron,
     'naive_bayes': MultinomialNB,
     'svm': LinearSVC
+}
+
+_FEATURE_SELECTION = {
+    'chi2': chi2,
+    'f_classif': f_classif,
+    'mutual_info_classif': mutual_info_classif
 }
 
 
@@ -59,6 +66,12 @@ if __name__ == '__main__':
                         nargs='+',
                         default=list(),
                         help='Layers for multilayer perceptron.')
+    parser.add_argument('--max_features',
+                        default=0,
+                        help='Max features to train the classifier with (needs a feature selection method).')
+    parser.add_argument('--feature_selection',
+                        default='f_classif',
+                        help='Feature selection method to apply to the dataset.')
 
     args = parser.parse_args()
 
@@ -88,7 +101,11 @@ if __name__ == '__main__':
                                     total=datasets.train_dataset.num_lemmas):
         with tf.Graph().as_default() as g:  # To avoid resource exhaustion
             model = _CLASSIFIERS[args.classifier](**config)
+
             try:
+                if 0 < args.max_features < datasets.train_dataset.input_vector_size():
+                    data = SelectKBest(args.feature_selection, k=args.max_features).fit_transform(data, target)
+
                 model.fit(data, target)
             except ValueError:  # Some classifiers cannot handle the case where the class is only one
                 test_target = datasets.test_dataset.target(lemma)

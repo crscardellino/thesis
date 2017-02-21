@@ -13,6 +13,7 @@ import warnings
 from keras import backend as K
 from sklearn.feature_selection import SelectKBest, chi2, f_classif, mutual_info_classif
 from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import KFold
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier
@@ -79,6 +80,10 @@ if __name__ == '__main__':
     parser.add_argument('--feature_selection',
                         default='f_classif',
                         help='Feature selection method to apply to the dataset.')
+    parser.add_argument('--folds',
+                        default=0,
+                        type=int,
+                        help='Activate to run the different folds.')
 
     args = parser.parse_args()
 
@@ -116,34 +121,78 @@ if __name__ == '__main__':
                 selector.fit(data, target)
                 data = selector.transform(data)
 
-            try:
-                model.fit(data, target)
-            except ValueError:
-                # Some classifiers cannot handle the case where the class is only one
-                # In that case we use the baseline of most frequent class
-                if np.unique(target).shape[0] != 1:
-                    raise
-                model = BaselineClassifier()
-                model.fit(data, target)
+            if args.folds > 0:
+                cummulative_indexes = []
 
-            train_results = pd.DataFrame(np.vstack([target, model.predict(data)]).T,
-                                         columns=['true', 'prediction'])
-            train_results.insert(0, 'corpus', 'train')
+                for split_index, indices in enumerate(np.array_split(np.arange(data.shape[0]), args.folds)):
+                    cummulative_indexes.extend(indices)
 
-            test_data = datasets.test_dataset.data(lemma)
-            test_target = datasets.test_dataset.target(lemma)
+                    train_data = data[cummulative_indexes]
+                    train_target = target[cummulative_indexes]
 
-            if 0 < args.max_features < datasets.train_dataset.input_vector_size():
-                test_data = selector.transform(test_data)
+                    kf = KFold(args.folds)
+                    for fold_index, (train_indices, test_indices) in enumerate(kf.split(train_data)):
+                        fold_train_data = train_data[train_indices]
+                        fold_test_data = train_data[test_indices]
+                        fold_train_target = train_target[train_indices]
+                        fold_test_target = train_target[test_indices]
 
-            test_results = pd.DataFrame(np.vstack([test_target, model.predict(test_data)]).T,
-                                        columns=['true', 'prediction'])
-            test_results.insert(0, 'corpus', 'test')
+                        try:
+                            model = _CLASSIFIERS[args.classifier](**config)
+                            model.fit(fold_train_data, fold_train_target)
+                        except ValueError:
+                            if np.unique(fold_train_target).shape[0] != 1:
+                                raise
+                            model = BaselineClassifier()
+                            model.fit(fold_train_data, fold_train_target)
 
-            all_results = pd.concat([train_results, test_results], ignore_index=True)
-            all_results.insert(0, 'lemma', lemma)
+                        fold_train_results = pd.DataFrame(
+                            np.vstack([fold_train_target, model.predict(fold_train_data)]).T,
+                            columns=['true', 'prediction']
+                        )
+                        fold_train_results.insert(0, 'fold', 'train.%d' % fold_index)
+                        fold_train_results.insert(0, 'split', split_index)
 
-            results.append(all_results)
+                        fold_test_results = pd.DataFrame(
+                            np.vstack([fold_test_target, model.predict(fold_test_data)]).T,
+                            columns=['true', 'prediction']
+                        )
+                        fold_test_results.insert(0, 'fold', 'test.%d' % fold_index)
+                        fold_test_results.insert(0, 'split', split_index)
+
+                        fold_results = pd.concat([fold_train_results, fold_test_results], ignore_index=True)
+                        fold_results.insert(0, 'lemma', lemma)
+
+                        results.append(fold_results)
+            else:
+                try:
+                    model.fit(data, target)
+                except ValueError:
+                    # Some classifiers cannot handle the case where the class is only one
+                    # In that case we use the baseline of most frequent class
+                    if np.unique(target).shape[0] != 1:
+                        raise
+                    model = BaselineClassifier()
+                    model.fit(data, target)
+
+                train_results = pd.DataFrame(np.vstack([target, model.predict(data)]).T,
+                                             columns=['true', 'prediction'])
+                train_results.insert(0, 'corpus', 'train')
+
+                test_data = datasets.test_dataset.data(lemma)
+                test_target = datasets.test_dataset.target(lemma)
+
+                if 0 < args.max_features < datasets.train_dataset.input_vector_size():
+                    test_data = selector.transform(test_data)
+
+                test_results = pd.DataFrame(np.vstack([test_target, model.predict(test_data)]).T,
+                                            columns=['true', 'prediction'])
+                test_results.insert(0, 'corpus', 'test')
+
+                all_results = pd.concat([train_results, test_results], ignore_index=True)
+                all_results.insert(0, 'lemma', lemma)
+
+                results.append(all_results)
 
     print('Saving results to %s' % args.results_path, file=sys.stderr)
     pd.concat(results, ignore_index=True).to_csv(args.results_path, index=False)

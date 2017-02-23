@@ -34,7 +34,7 @@ do
     python -m thesis.classification \
         $directory/train_dataset.npz \
         $directory/test_dataset.npz \
-        ../results/mlp_${dataset}.csv \
+        ../results/mlp_5000_${dataset}.csv \
         --classifier mlp \
         --max_features 10000 \
         --layers 5000

@@ -6,6 +6,7 @@ import argparse
 import json
 import numpy as np
 import pandas as pd
+import scipy.sparse as sps
 import sys
 import tensorflow as tf
 import warnings
@@ -13,9 +14,10 @@ import warnings
 from keras import backend as K
 from sklearn.feature_selection import SelectKBest, chi2, f_classif, mutual_info_classif
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import KFold
+from sklearn.metrics import log_loss
+from sklearn.model_selection import StratifiedKFold
 from sklearn.naive_bayes import MultinomialNB
-from sklearn.svm import LinearSVC
+from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from thesis.classification import BaselineClassifier, KerasMultilayerPerceptron
 from thesis.dataset import SenseCorpusDatasets
@@ -33,7 +35,7 @@ _CLASSIFIERS = {
     'log': LogisticRegression,
     'mlp': KerasMultilayerPerceptron,
     'naive_bayes': MultinomialNB,
-    'svm': LinearSVC
+    'svm': SVC
 }
 
 _FEATURE_SELECTION = {
@@ -41,6 +43,66 @@ _FEATURE_SELECTION = {
     'f_classif': f_classif,
     'mutual_info_classif': mutual_info_classif
 }
+
+
+def folds_training(folds, data, target, lemma, classifier, config):
+    cummulative_indexes = []
+    return_results = []
+
+    for split_index, indices in enumerate(idxs for _, idxs in StratifiedKFold(folds).split(data, target)):
+        cummulative_indexes.extend(indices)
+
+        train_data = data[cummulative_indexes]
+        train_target = target[cummulative_indexes]
+
+        kf = StratifiedKFold(folds)
+        for fold_index, (train_indices, test_indices) in enumerate(kf.split(train_data, train_target)):
+            fold_train_data = train_data[train_indices]
+            fold_test_data = train_data[test_indices]
+            fold_train_target = train_target[train_indices]
+            fold_test_target = train_target[test_indices]
+            labels = np.unique(fold_train_target)
+
+            try:
+                model = _CLASSIFIERS[classifier](**config)
+                model.fit(fold_train_data, fold_train_target)
+            except ValueError:
+                if np.unique(fold_train_target).shape[0] != 1:
+                    raise
+                model = BaselineClassifier()
+                model.fit(fold_train_data, fold_train_target)
+
+            try:
+                train_error = log_loss(fold_train_target, model.predict_proba(fold_train_data), labels=labels)
+                test_error = log_loss(fold_test_target, model.predict_proba(fold_test_data), labels=labels)
+            except ValueError:
+                if np.unique(fold_train_target).shape[0] != 1:
+                    raise
+                train_error = 0
+                test_error = 0
+
+            fold_train_results = pd.DataFrame(
+                np.vstack([fold_train_target, model.predict(fold_train_data)]).T,
+                columns=['true', 'prediction']
+            )
+            fold_train_results.insert(0, 'error', train_error)
+            fold_train_results.insert(0, 'fold', 'train.%d' % fold_index)
+
+            fold_test_results = pd.DataFrame(
+                np.vstack([fold_test_target, model.predict(fold_test_data)]).T,
+                columns=['true', 'prediction']
+            )
+            fold_test_results.insert(0, 'error', test_error)
+            fold_test_results.insert(0, 'fold', 'test.%d' % fold_index)
+
+            fold_results = pd.concat([fold_train_results, fold_test_results], ignore_index=True)
+            fold_results.insert(0, 'size', indices.shape[0])
+            fold_results.insert(0, 'split', split_index)
+            fold_results.insert(0, 'lemma', lemma)
+
+            return_results.append(fold_results)
+
+    return return_results
 
 
 if __name__ == '__main__':
@@ -100,6 +162,10 @@ if __name__ == '__main__':
     for key, value in args.classifier_config:
         config[key] = try_number(value)
 
+    if args.classifier == 'svm':
+        config['kernel'] = 'linear'
+        config['probability'] = True
+
     if args.layers:
         config['layers'] = [args.layers] if isinstance(args.layers, int) else args.layers
 
@@ -114,57 +180,30 @@ if __name__ == '__main__':
         tf.reset_default_graph()
         with tf.Session() as sess:
             K.set_session(sess)
-            model = _CLASSIFIERS[args.classifier](**config)
             selector = SelectKBest(_FEATURE_SELECTION[args.feature_selection], k=args.max_features)
 
-            if 0 < args.max_features < datasets.train_dataset.input_vector_size():
-                selector.fit(data, target)
-                data = selector.transform(data)
-
             if args.folds > 0:
-                cummulative_indexes = []
+                # We use everything but removing classes we have no idea about (-1)
+                data = sps.vstack([data, datasets.test_dataset.data(lemma)])
+                target = np.concatenate([target, datasets.test_dataset.target(lemma)])
 
-                for split_index, indices in enumerate(np.array_split(np.arange(data.shape[0]), args.folds)):
-                    cummulative_indexes.extend(indices)
+                filtered = np.where(target != -1)[0]
 
-                    train_data = data[cummulative_indexes]
-                    train_target = target[cummulative_indexes]
+                data = data[filtered]
+                target = target[filtered]
 
-                    kf = KFold(args.folds)
-                    for fold_index, (train_indices, test_indices) in enumerate(kf.split(train_data)):
-                        fold_train_data = train_data[train_indices]
-                        fold_test_data = train_data[test_indices]
-                        fold_train_target = train_target[train_indices]
-                        fold_test_target = train_target[test_indices]
+                if 0 < args.max_features < datasets.train_dataset.input_vector_size():
+                    selector.fit(data, target)
+                    data = selector.transform(data)
 
-                        try:
-                            model = _CLASSIFIERS[args.classifier](**config)
-                            model.fit(fold_train_data, fold_train_target)
-                        except ValueError:
-                            if np.unique(fold_train_target).shape[0] != 1:
-                                raise
-                            model = BaselineClassifier()
-                            model.fit(fold_train_data, fold_train_target)
-
-                        fold_train_results = pd.DataFrame(
-                            np.vstack([fold_train_target, model.predict(fold_train_data)]).T,
-                            columns=['true', 'prediction']
-                        )
-                        fold_train_results.insert(0, 'fold', 'train.%d' % fold_index)
-                        fold_train_results.insert(0, 'split', split_index)
-
-                        fold_test_results = pd.DataFrame(
-                            np.vstack([fold_test_target, model.predict(fold_test_data)]).T,
-                            columns=['true', 'prediction']
-                        )
-                        fold_test_results.insert(0, 'fold', 'test.%d' % fold_index)
-                        fold_test_results.insert(0, 'split', split_index)
-
-                        fold_results = pd.concat([fold_train_results, fold_test_results], ignore_index=True)
-                        fold_results.insert(0, 'lemma', lemma)
-
-                        results.append(fold_results)
+                results.extend(folds_training(args.folds, data, target, lemma, args.classifier, config))
             else:
+                if 0 < args.max_features < datasets.train_dataset.input_vector_size():
+                    selector.fit(data, target)
+                    data = selector.transform(data)
+
+                model = _CLASSIFIERS[args.classifier](**config)
+
                 try:
                     model.fit(data, target)
                 except ValueError:
@@ -195,4 +234,4 @@ if __name__ == '__main__':
                 results.append(all_results)
 
     print('Saving results to %s' % args.results_path, file=sys.stderr)
-    pd.concat(results, ignore_index=True).to_csv(args.results_path, index=False)
+    pd.concat(results, ignore_index=True).to_csv(args.results_path, index=False, float_format='%.2e')

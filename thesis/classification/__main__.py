@@ -45,11 +45,11 @@ _FEATURE_SELECTION = {
 }
 
 
-def folds_training(folds, data, target, lemma, classifier, config):
+def folds_training(folds, splits, data, target, lemma, classifier, config):
     cummulative_indexes = []
     return_results = []
 
-    for split_index, indices in enumerate(idxs for _, idxs in StratifiedKFold(folds).split(data, target)):
+    for split_index, indices in enumerate(idxs for _, idxs in StratifiedKFold(splits).split(data, target)):
         cummulative_indexes.extend(indices)
 
         train_data = data[cummulative_indexes]
@@ -142,6 +142,10 @@ if __name__ == '__main__':
     parser.add_argument('--feature_selection',
                         default='f_classif',
                         help='Feature selection method to apply to the dataset.')
+    parser.add_argument('--splits',
+                        default=1,
+                        type=int,
+                        help='Number of splits for increasing corpus size in training.')
     parser.add_argument('--folds',
                         default=0,
                         type=int,
@@ -196,7 +200,7 @@ if __name__ == '__main__':
                     selector.fit(data, target)
                     data = selector.transform(data)
 
-                results.extend(folds_training(args.folds, data, target, lemma, args.classifier, config))
+                results.extend(folds_training(args.folds, args.splits, data, target, lemma, args.classifier, config))
             else:
                 if 0 < args.max_features < datasets.train_dataset.input_vector_size():
                     selector.fit(data, target)

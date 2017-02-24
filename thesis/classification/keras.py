@@ -16,7 +16,7 @@ class KerasMultilayerPerceptron(object):
 
     def __init__(self, layers=list(), layers_activation='tanh', classification_layer_activation='softmax',
                  layers_initialization='uniform', dropout_layers=None, optimizer='adam',
-                 loss='categorical_crossentropy', epochs=100, batch_size=50, metrics=None, l1=0.01, l2=0.01,
+                 loss='categorical_crossentropy', epochs=25, batch_size=50, metrics=None, l1=0., l2=1e-3,
                  verbosity=0):
         self._layers = layers
         self._layers_activation = layers_activation

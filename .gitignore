@@ -100,3 +100,4 @@ ENV/
 *.tar.*
 *.tgz
 *.xml
+*.csv

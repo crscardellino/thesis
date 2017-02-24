@@ -57,50 +57,54 @@ def folds_training(folds, splits, data, target, lemma, classifier, config):
 
         kf = StratifiedKFold(folds)
         for fold_index, (train_indices, test_indices) in enumerate(kf.split(train_data, train_target)):
-            fold_train_data = train_data[train_indices]
-            fold_test_data = train_data[test_indices]
-            fold_train_target = train_target[train_indices]
-            fold_test_target = train_target[test_indices]
-            labels = np.unique(fold_train_target)
+            tf.reset_default_graph()
+            with tf.Session() as sess:
+                K.set_session(sess)
 
-            try:
-                model = _CLASSIFIERS[classifier](**config)
-                model.fit(fold_train_data, fold_train_target)
-            except ValueError:
-                if np.unique(fold_train_target).shape[0] != 1:
-                    raise
-                model = BaselineClassifier()
-                model.fit(fold_train_data, fold_train_target)
+                fold_train_data = train_data[train_indices]
+                fold_test_data = train_data[test_indices]
+                fold_train_target = train_target[train_indices]
+                fold_test_target = train_target[test_indices]
+                labels = np.unique(fold_train_target)
 
-            try:
-                train_error = log_loss(fold_train_target, model.predict_proba(fold_train_data), labels=labels)
-                test_error = log_loss(fold_test_target, model.predict_proba(fold_test_data), labels=labels)
-            except ValueError:
-                if np.unique(fold_train_target).shape[0] != 1:
-                    raise
-                train_error = 0
-                test_error = 0
+                try:
+                    model = _CLASSIFIERS[classifier](**config)
+                    model.fit(fold_train_data, fold_train_target)
+                except ValueError:
+                    if np.unique(fold_train_target).shape[0] != 1:
+                        raise
+                    model = BaselineClassifier()
+                    model.fit(fold_train_data, fold_train_target)
 
-            fold_train_results = pd.DataFrame(
-                np.vstack([fold_train_target, model.predict(fold_train_data)]).T,
-                columns=['true', 'prediction']
-            )
-            fold_train_results.insert(0, 'error', train_error)
-            fold_train_results.insert(0, 'fold', 'train.%d' % fold_index)
+                try:
+                    train_error = log_loss(fold_train_target, model.predict_proba(fold_train_data), labels=labels)
+                    test_error = log_loss(fold_test_target, model.predict_proba(fold_test_data), labels=labels)
+                except ValueError:
+                    if np.unique(fold_train_target).shape[0] != 1:
+                        raise
+                    train_error = 0
+                    test_error = 0
 
-            fold_test_results = pd.DataFrame(
-                np.vstack([fold_test_target, model.predict(fold_test_data)]).T,
-                columns=['true', 'prediction']
-            )
-            fold_test_results.insert(0, 'error', test_error)
-            fold_test_results.insert(0, 'fold', 'test.%d' % fold_index)
+                fold_train_results = pd.DataFrame(
+                    np.vstack([fold_train_target, model.predict(fold_train_data)]).T,
+                    columns=['true', 'prediction']
+                )
+                fold_train_results.insert(0, 'error', train_error)
+                fold_train_results.insert(0, 'fold', 'train.%d' % fold_index)
 
-            fold_results = pd.concat([fold_train_results, fold_test_results], ignore_index=True)
-            fold_results.insert(0, 'size', indices.shape[0])
-            fold_results.insert(0, 'split', split_index)
-            fold_results.insert(0, 'lemma', lemma)
+                fold_test_results = pd.DataFrame(
+                    np.vstack([fold_test_target, model.predict(fold_test_data)]).T,
+                    columns=['true', 'prediction']
+                )
+                fold_test_results.insert(0, 'error', test_error)
+                fold_test_results.insert(0, 'fold', 'test.%d' % fold_index)
 
-            return_results.append(fold_results)
+                fold_results = pd.concat([fold_train_results, fold_test_results], ignore_index=True)
+                fold_results.insert(0, 'size', indices.shape[0])
+                fold_results.insert(0, 'split', split_index)
+                fold_results.insert(0, 'lemma', lemma)
+
+                return_results.append(fold_results)
 
     return return_results
 
@@ -181,27 +185,27 @@ if __name__ == '__main__':
     print('Training models and getting results', file=sys.stderr)
     for lemma, data, target in tqdm(datasets.train_dataset.traverse_dataset_by_lemma(),
                                     total=datasets.train_dataset.num_lemmas):
-        tf.reset_default_graph()
-        with tf.Session() as sess:
-            K.set_session(sess)
-            selector = SelectKBest(_FEATURE_SELECTION[args.feature_selection], k=args.max_features)
+        if args.folds > 0:
+            # We use everything but removing classes we have no idea about (-1)
+            data = sps.vstack([data, datasets.test_dataset.data(lemma)])
+            target = np.concatenate([target, datasets.test_dataset.target(lemma)])
 
-            if args.folds > 0:
-                # We use everything but removing classes we have no idea about (-1)
-                data = sps.vstack([data, datasets.test_dataset.data(lemma)])
-                target = np.concatenate([target, datasets.test_dataset.target(lemma)])
+            filtered = np.where(target != -1)[0]
 
-                filtered = np.where(target != -1)[0]
+            data = data[filtered]
+            target = target[filtered]
 
-                data = data[filtered]
-                target = target[filtered]
+            if 0 < args.max_features < datasets.train_dataset.input_vector_size():
+                selector.fit(data, target)
+                data = selector.transform(data)
 
-                if 0 < args.max_features < datasets.train_dataset.input_vector_size():
-                    selector.fit(data, target)
-                    data = selector.transform(data)
+            results.extend(folds_training(args.folds, args.splits, data, target, lemma, args.classifier, config))
+        else:
+            tf.reset_default_graph()
+            with tf.Session() as sess:
+                K.set_session(sess)
+                selector = SelectKBest(_FEATURE_SELECTION[args.feature_selection], k=args.max_features)
 
-                results.extend(folds_training(args.folds, args.splits, data, target, lemma, args.classifier, config))
-            else:
                 if 0 < args.max_features < datasets.train_dataset.input_vector_size():
                     selector.fit(data, target)
                     data = selector.transform(data)

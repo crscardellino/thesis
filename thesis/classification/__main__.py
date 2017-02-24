@@ -58,7 +58,8 @@ def folds_training(folds, splits, data, target, lemma, classifier, config):
         kf = StratifiedKFold(folds)
         for fold_index, (train_indices, test_indices) in enumerate(kf.split(train_data, train_target)):
             tf.reset_default_graph()
-            with tf.Session() as sess:
+            gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)
+            with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
                 K.set_session(sess)
 
                 fold_train_data = train_data[train_indices]
@@ -202,7 +203,8 @@ if __name__ == '__main__':
             results.extend(folds_training(args.folds, args.splits, data, target, lemma, args.classifier, config))
         else:
             tf.reset_default_graph()
-            with tf.Session() as sess:
+            gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)
+            with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
                 K.set_session(sess)
                 selector = SelectKBest(_FEATURE_SELECTION[args.feature_selection], k=args.max_features)
 

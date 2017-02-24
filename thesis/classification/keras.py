@@ -30,7 +30,7 @@ class KerasMultilayerPerceptron(object):
         self._metrics = metrics
         self._l1 = l1
         self._l2 = l2
-        self._verbosity = 0
+        self._verbosity = verbosity
         self._model = None
         self._classes = None
 

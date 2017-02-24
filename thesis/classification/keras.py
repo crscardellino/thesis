@@ -16,7 +16,8 @@ class KerasMultilayerPerceptron(object):
 
     def __init__(self, layers=list(), layers_activation='tanh', classification_layer_activation='softmax',
                  layers_initialization='uniform', dropout_layers=None, optimizer='adam',
-                 loss='categorical_crossentropy', epochs=100, batch_size=50, metrics=None, l1=0.01, l2=0.01):
+                 loss='categorical_crossentropy', epochs=100, batch_size=50, metrics=None, l1=0.01, l2=0.01,
+                 verbosity=0):
         self._layers = layers
         self._layers_activation = layers_activation
         self._classification_layer_activation = classification_layer_activation
@@ -29,6 +30,7 @@ class KerasMultilayerPerceptron(object):
         self._metrics = metrics
         self._l1 = l1
         self._l2 = l2
+        self._verbosity = 0
         self._model = None
         self._classes = None
 
@@ -79,7 +81,7 @@ class KerasMultilayerPerceptron(object):
         x = x.toarray() if issparse(x) else x
 
         return self._model.fit(x, to_categorical(np.searchsorted(self._classes, y)),
-                               nb_epoch=self._epochs, batch_size=self._batch_size, verbose=0)
+                               nb_epoch=self._epochs, batch_size=self._batch_size, verbose=self._verbosity)
 
     def predict(self, x):
         """
@@ -88,7 +90,7 @@ class KerasMultilayerPerceptron(object):
         assert self._model is not None, "The model needs to be trained"
 
         x = x.toarray() if issparse(x) else x
-        predicted_classes = self._model.predict_classes(x, batch_size=self._batch_size, verbose=0)
+        predicted_classes = self._model.predict_classes(x, batch_size=self._batch_size, verbose=self._verbosity)
 
         return self._classes[predicted_classes]
 
@@ -99,4 +101,4 @@ class KerasMultilayerPerceptron(object):
         assert self._model is not None, "The model needs to be trained"
 
         x = x.toarray() if issparse(x) else x
-        return self._model.predict(x, verbose=0)
+        return self._model.predict(x, verbose=self._verbosity)

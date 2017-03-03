@@ -186,6 +186,8 @@ if __name__ == '__main__':
 
     results = []
 
+    used_lemmas = 0
+
     print('Training models and getting results', file=sys.stderr)
     for lemma, data, target in tqdm(datasets.train_dataset.traverse_dataset_by_lemma(),
                                     total=datasets.train_dataset.num_lemmas):
@@ -204,8 +206,10 @@ if __name__ == '__main__':
                 minimum_counts = np.where(counts >= args.folds * args.splits)[0]
 
                 if minimum_counts.shape[0] < 2:
-                    print('Lemma %s has no sufficient classes to ensure minimum' % lemma, file=sys.stderr)
+                    tqdm.write('Lemma %s has no sufficient classes to ensure minimum' % lemma, file=sys.stderr)
                     continue
+                else:
+                    used_lemmas += 1
 
                 filtered_by_count = np.in1d(target, labels[minimum_counts])
                 data = data[filtered_by_count]
@@ -257,6 +261,9 @@ if __name__ == '__main__':
                 all_results.insert(0, 'lemma', lemma)
 
                 results.append(all_results)
+
+    if args.ensure_minimum:
+        print('There was a total of %d out of %d lemmas used' % (used_lemmas, datasets.train_dataset.num_lemmas))
 
     print('Saving results to %s' % args.results_path, file=sys.stderr)
     pd.concat(results, ignore_index=True).to_csv(args.results_path, index=False, float_format='%.2e')

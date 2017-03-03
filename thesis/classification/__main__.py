@@ -155,6 +155,9 @@ if __name__ == '__main__':
                         default=0,
                         type=int,
                         help='Activate to run the different folds.')
+    parser.add_argument('--ensure_minimum',
+                        action='store_true',
+                        help='In case of using folds ensure the minimum amount of classes needed is respected.')
 
     args = parser.parse_args()
 
@@ -195,6 +198,18 @@ if __name__ == '__main__':
 
             data = data[filtered]
             target = target[filtered]
+
+            if args.ensure_minimum:
+                labels, counts = np.unique(target, return_counts=True)
+                minimum_counts = np.where(counts >= args.folds * args.splits)[0]
+
+                if minimum_counts.shape[0] < 2:
+                    print('Lemma %s has no sufficient classes to ensure minimum' % lemma, file=sys.stderr)
+                    continue
+
+                filtered_by_count = np.in1d(target, labels[minimum_counts])
+                data = data[filtered_by_count]
+                target = target[filtered_by_count]
 
             if 0 < args.max_features < datasets.train_dataset.input_vector_size():
                 selector.fit(data, target)

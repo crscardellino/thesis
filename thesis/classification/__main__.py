@@ -263,7 +263,11 @@ if __name__ == '__main__':
                 results.append(all_results)
 
     if args.ensure_minimum:
-        print('There was a total of %d out of %d lemmas used' % (used_lemmas, datasets.train_dataset.num_lemmas))
+        print('There was a total of %d out of %d lemmas used' % (used_lemmas, datasets.train_dataset.num_lemmas),
+              file=sys.stderr)
 
-    print('Saving results to %s' % args.results_path, file=sys.stderr)
-    pd.concat(results, ignore_index=True).to_csv(args.results_path, index=False, float_format='%.2e')
+    try:
+        print('Saving results to %s' % args.results_path, file=sys.stderr)
+        pd.concat(results, ignore_index=True).to_csv(args.results_path, index=False, float_format='%.2e')
+    except ValueError:
+        print('No results to save', file=sys.stderr)

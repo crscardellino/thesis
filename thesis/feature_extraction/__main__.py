@@ -137,7 +137,7 @@ if __name__ == '__main__':
         if args.hashing:
             matrix = vstack(instances[corpus])
         elif args.windowizer:
-            matrix = np.array([np.array(ww) for ww in instances[corpus]])
+            matrix = np.array(instances[corpus])
         else:
             matrix = vectorizer.transform(instances[corpus])
 

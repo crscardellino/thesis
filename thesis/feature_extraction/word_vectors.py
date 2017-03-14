@@ -23,14 +23,16 @@ class WordWindowExtractor(object):
 
         word_window_tokens = [word.tokens for word in full_word_window]
 
+        shifted_lemma_index = main_lemma_index - 1  # In order to use zero based index
+
         # Padding the window vector in case the predicate is located near the start or end of the sentence
-        if main_word.idx - self._window_size < 0:  # Pad to left if the predicate is near to the start
-            for _ in range(abs(main_word.idx - self._window_size)):
+        if shifted_lemma_index - self._window_size < 0:  # Pad to left if the predicate is near to the start
+            for _ in range(abs(shifted_lemma_index - self._window_size)):
                 word_window_tokens.insert(0, (self._filler_tag,) * len(main_word.tokens))
 
-        if main_word.idx + self._window_size + 1 > len(sentence):
+        if shifted_lemma_index + self._window_size + 1 > len(sentence):
             # Pad to right if the predicate is near to the end
-            for _ in range(main_word.idx + self._window_size + 1 - len(sentence)):
+            for _ in range(shifted_lemma_index + self._window_size + 1 - len(sentence)):
                 word_window_tokens.append((self._filler_tag,) * len(main_word.tokens))
 
         return word_window_tokens

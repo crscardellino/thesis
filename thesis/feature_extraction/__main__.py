@@ -11,7 +11,8 @@ import sys
 from collections import defaultdict
 from scipy.sparse import vstack
 from sklearn.feature_extraction import DictVectorizer
-from thesis.feature_extraction import HandcraftedFeaturesExtractor, HandcraftedHashedFeaturesExtractor
+from thesis.feature_extraction import (HandcraftedFeaturesExtractor, HandcraftedHashedFeaturesExtractor,
+                                       WordWindowExtractor)
 from thesis.parsers import ColumnCorpusParser
 from thesis.utils import SEMEVAL_COLUMNS, SENSEM_COLUMNS
 from tqdm import tqdm
@@ -50,6 +51,9 @@ if __name__ == '__main__':
     parser.add_argument('--hashing',
                         action='store_true',
                         help='If active use the `hashing trick` for featurization.')
+    parser.add_argument('--windowizer',
+                        action='store_true',
+                        help='If active use word window extractor.')
     parser.add_argument('--hashed_features',
                         type=int,
                         default=2**10,
@@ -79,10 +83,17 @@ if __name__ == '__main__':
 
     features['window_size'] = args.window_size
 
-    extractor = HandcraftedHashedFeaturesExtractor(
-        n_features=args.hashed_features,
-        non_negative=not args.negative_hash,
-        **features) if args.hashing else HandcraftedFeaturesExtractor(**features)
+    if args.hashing:
+        if args.windowizer:
+            print('WARNING: Ignoring `windowizer` option in favor of hashing', file=sys.stderr)
+        extractor = HandcraftedHashedFeaturesExtractor(
+            n_features=args.hashed_features,
+            non_negative=not args.negative_hash,
+            **features)
+    elif args.windowizer:
+        extractor = WordWindowExtractor(args.window_size)
+    else:
+        extractor = HandcraftedFeaturesExtractor(**features)
 
     parser = ColumnCorpusParser(args.corpus, *_CORPUS_COLUMNS[args.corpus_name])
 
@@ -108,12 +119,12 @@ if __name__ == '__main__':
         label = '%s.%s.%s' % (getattr(sentence, 'lemma_tag', 'v'), sentence.main_lemma, sentence.sense)
         corpus = 'nonverb.%s' % sentence.corpus if not label.startswith('v') else sentence.corpus
 
-        instances[corpus].append(extractor.featurize_sentence(sentence))
+        instances[corpus].append(extractor.instantiate_sentence(sentence))
         labels[corpus].append(label)
         sentences_id[corpus].append(sentence.sentence_index)
         corpus_lemmas[corpus].append(sentence.main_lemma)
 
-    if not args.hashing:
+    if not (args.hashing or args.windowizer):
         print('Vectorizing features', file=sys.stderr)
         vectorizer.fit(instances['train'] + instances['test'])
 
@@ -125,14 +136,23 @@ if __name__ == '__main__':
     for corpus in instances:
         if args.hashing:
             matrix = vstack(instances[corpus])
+        elif args.windowizer:
+            matrix = np.array([np.array(ww) for ww in instances[corpus]])
         else:
             matrix = vectorizer.transform(instances[corpus])
 
         target = np.array([train_classes.get(lbl, -1) for lbl in labels[corpus]])
         sentences = np.array(sentences_id[corpus])
         lemmas = np.array(corpus_lemmas[corpus])
-        np.savez_compressed(os.path.join(args.save_path, '%s_dataset.npz' % corpus),
-                            data=matrix.data, indices=matrix.indices, indptr=matrix.indptr, shape=matrix.shape,
-                            target=target, train_classes=sorted(train_classes), sentences=sentences, lemmas=lemmas)
+
+        if args.windowizer:
+            np.savez_compressed(os.path.join(args.save_path, '%s_dataset.npz' % corpus),
+                                data=matrix, target=target, train_classes=sorted(train_classes),
+                                sentences=sentences, lemmas=lemmas)
+        else:
+            np.savez_compressed(os.path.join(args.save_path, '%s_dataset.npz' % corpus),
+                                data=matrix.data, indices=matrix.indices, indptr=matrix.indptr,
+                                shape=matrix.shape, target=target, train_classes=sorted(train_classes),
+                                sentences=sentences, lemmas=lemmas)
 
     print('Finished', file=sys.stderr)

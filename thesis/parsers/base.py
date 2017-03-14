@@ -42,6 +42,22 @@ class Word(object):
     def extras(self):
         return list(self._extras.values())
 
+    @property
+    def tokens(self):
+        """
+        Method to get different combinations of tokens, with different use of capital letters
+        in order to look for it in a embedding model.
+        :return: A list of all possible combinations of a token or a lemma, ordered by importance
+        """
+
+        return (
+            self.token,
+            self.token.lower(),
+            self.lemma,
+            self.token.upper(),
+            self.lemma.upper()
+        )
+
 
 class Sentence(object):
     def __init__(self, metadata, sentence, *columns):
@@ -89,6 +105,16 @@ class Sentence(object):
         index = int(index)
         assert index > 0 and index == self._words[index-1].idx
         return self._words[index-1]
+
+    def get_word_windows(self, loc, window_size):
+        """
+        Return the window_size words to the left and right of loc.
+        :param loc: int
+        :param window_size: int
+        :return: Left and right window of words of word in loc.
+        """
+        loc -= 1  # Words are numerated from 1
+        return self._words[max(0, loc - window_size):loc], self._words[loc+1:loc+window_size+1]
 
     @property
     def corpus_name(self):

@@ -104,3 +104,10 @@ ENV/
 
 # OSX
 .DS_Store
+
+# graphics
+*.png
+*.jpg
+*.tiff
+*.bmp
+*.gif

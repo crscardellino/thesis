@@ -12,6 +12,7 @@ import tensorflow as tf
 import warnings
 
 from keras import backend as K
+from scipy.sparse import issparse
 from sklearn.feature_selection import SelectKBest, chi2, f_classif, mutual_info_classif
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import log_loss
@@ -158,6 +159,10 @@ if __name__ == '__main__':
     parser.add_argument('--ensure_minimum',
                         action='store_true',
                         help='In case of using folds ensure the minimum amount of classes needed is respected.')
+    parser.add_argument('--word_vectors_model_path',
+                        type=str,
+                        default=None,
+                        help='Path to the word vectors file in case of using one.')
 
     args = parser.parse_args()
 
@@ -182,7 +187,7 @@ if __name__ == '__main__':
         config['layers'] = [args.layers] if isinstance(args.layers, int) else args.layers
 
     print('Loading data', file=sys.stderr)
-    datasets = SenseCorpusDatasets(args.train_dataset, args.test_dataset)
+    datasets = SenseCorpusDatasets(args.train_dataset, args.test_dataset, args.word_vectors_model_path)
 
     results = []
 
@@ -193,7 +198,11 @@ if __name__ == '__main__':
                                     total=datasets.train_dataset.num_lemmas):
         if args.folds > 0:
             # We use everything but removing classes we have no idea about (-1)
-            data = sps.vstack([data, datasets.test_dataset.data(lemma)])
+            if issparse(data):  # Difference between using word vectors or handcrafted features
+                data = sps.vstack([data, datasets.test_dataset.data(lemma)])
+            else:
+                data = np.vstack((data, datasets.test_dataset.data(lemma)))
+
             target = np.concatenate([target, datasets.test_dataset.target(lemma)])
 
             filtered = np.where(target != -1)[0]

@@ -5,6 +5,7 @@ from __future__ import absolute_import, unicode_literals
 from collections import OrderedDict
 from tabulate import tabulate
 from thesis.utils import try_number
+from tqdm import tqdm
 
 
 class Word(object):
@@ -133,16 +134,18 @@ class Sentence(object):
 
 
 class ColumnCorpusParser(object):
-    def __init__(self, path, *columns):
+    def __init__(self, path, *columns, total_lines=0, verbose=False):
         self._path = path
         self._columns = columns
+        self._total_lines = total_lines
+        self._verbose = verbose
 
     @property
     def sentences(self):
         with open(self._path, 'r') as f:
             metadata = {}
             sentence = []
-            for line in f:
+            for line in tqdm(f, total=self._total_lines, disable=not self._verbose):
                 if line.strip().startswith('META'):
                     metadata = dict([tuple(mdata.split(':', 1)) for mdata in line.strip().split()])
                 elif line.strip() != '':

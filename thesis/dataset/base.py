@@ -3,6 +3,7 @@
 from __future__ import absolute_import, unicode_literals
 
 import numpy as np
+import pickle
 
 from gensim.models import Word2Vec
 from scipy.sparse import csr_matrix
@@ -78,7 +79,12 @@ class SenseCorpusDataset(object):
 
 class SenseCorpusDatasets(object):
     def __init__(self, train_dataset_path, test_dataset_path, word_vector_model_path=None, dtype=np.float32):
-        word_vector_model = Word2Vec.load_word2vec_format(word_vector_model_path, binary=True)\
-            if word_vector_model_path is not None else None
+        try:
+            word_vector_model = Word2Vec.load_word2vec_format(word_vector_model_path, binary=True)\
+                if word_vector_model_path is not None else None
+        except UnicodeDecodeError:
+            with open(word_vector_model_path, 'rb') as fvectors:
+                word_vector_model = pickle.load(fvectors)
+
         self.train_dataset = SenseCorpusDataset(train_dataset_path, word_vector_model, dtype)
         self.test_dataset = SenseCorpusDataset(test_dataset_path, word_vector_model, dtype)

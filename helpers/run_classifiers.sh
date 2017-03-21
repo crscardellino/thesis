@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 set -e
 
-vector_ext=${1:-bin.gz}
+vector_ext=${1:-svd.pkl}
 
 cd ..
 
@@ -15,7 +15,7 @@ do
         python -m thesis.classification \
             $directory/train_dataset.npz \
             $directory/test_dataset.npz \
-            ../results/experiment_word_vectors/svm_${dataset}_${wv}.csv \
+            ../results/experiment_word_vectors/svm_${dataset}_${wv}_${vector_ext}.csv \
             --classifier svm \
             --word_vectors_model_path ../resources/word_vectors/${wv}.wordvectors.${vector_ext}
 
@@ -23,7 +23,7 @@ do
         python -m thesis.classification \
             $directory/train_dataset.npz \
             $directory/test_dataset.npz \
-            ../results/experiment_word_vectors/mlp_1800_${dataset}_${wv}.csv \
+            ../results/experiment_word_vectors/mlp_1800_${dataset}_${wv}_${vector_ext}.csv \
             --classifier mlp \
             --word_vectors_model_path ../resources/word_vectors/${wv}.wordvectors.${vector_ext} \
             --layers 1800
@@ -41,7 +41,7 @@ do
                 python -m thesis.classification \
                     $directory/train_dataset.npz \
                     $directory/test_dataset.npz \
-                    ../results/experiment_word_vectors/svm_${dataset}_${splits}_splits_${folds}_folds_${wv}.csv \
+                    ../results/experiment_word_vectors/svm_${dataset}_${splits}_splits_${folds}_folds_${wv}_${vector_ext}.csv \
                     --classifier svm \
                     --word_vectors_model_path ../resources/word_vectors/${wv}.wordvectors.${vector_ext} \
                     --splits $splits \
@@ -52,7 +52,7 @@ do
                 python -m thesis.classification \
                     $directory/train_dataset.npz \
                     $directory/test_dataset.npz \
-                    ../results/experiment_word_vectors/mlp_1800_${dataset}_${splits}_splits_${folds}_folds_${wv}.csv \
+                    ../results/experiment_word_vectors/mlp_1800_${dataset}_${splits}_splits_${folds}_folds_${wv}_${vector_ext}.csv \
                     --classifier mlp \
                     --word_vectors_model_path ../resources/word_vectors/${wv}.wordvectors.${vector_ext} \
                     --layers 1800 \

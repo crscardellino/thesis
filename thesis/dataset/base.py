@@ -21,7 +21,13 @@ class SenseCorpusDataset(object):
         else:
             self._data = dataset['data']
             self._word_vector_model = word_vector_model
-            self._input_vector_size = self._data.shape[1] * self._word_vector_model.vector_size
+
+            try:
+                self._word_vector_size = self._word_vector_model.vector_size
+            except AttributeError:
+                self._word_vector_size = next(iter(self._word_vector_model.values())).shape[0]
+
+            self._input_vector_size = self._data.shape[1] * self._word_vector_size
 
         self._target = dataset['target']
 
@@ -38,7 +44,7 @@ class SenseCorpusDataset(object):
             try:
                 vector.append(self._word_vector_model[next(t for t in word if t in self._word_vector_model)])
             except StopIteration:
-                vector.append(np.zeros(self._word_vector_model.vector_size, dtype=self.dtype))
+                vector.append(np.zeros(self._word_vector_size, dtype=self.dtype))
 
         return np.concatenate(vector)
 

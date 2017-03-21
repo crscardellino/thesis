@@ -111,3 +111,8 @@ ENV/
 *.tiff
 *.bmp
 *.gif
+
+# Other
+logs/
+*.err
+*.out

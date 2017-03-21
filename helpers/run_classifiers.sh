@@ -57,18 +57,6 @@ do
                     --splits $splits \
                     --folds $folds \
                     --ensure_minimum
-
-                >&2 echo "Running classifier mlp with 2 layers for $dataset for $splits splits and $folds folds"
-                python -m thesis.classification \
-                    $directory/train_dataset.npz \
-                    $directory/test_dataset.npz \
-                    ../results/experiment_word_vectors/mlp_1800_900_${dataset}_${splits}_splits_${folds}_folds_${wv}.csv \
-                    --classifier mlp \
-                    --word_vectors_model_path ../resources/word_vectors/${wv}.wordvectors.bin.gz \
-                    --layers 1800 900 \
-                    --splits $splits \
-                    --folds $folds \
-                    --ensure_minimum
             done
         done
     done

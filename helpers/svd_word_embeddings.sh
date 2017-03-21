@@ -11,5 +11,5 @@ do
         --window_size 5 \
         --min_count 2 \
         /home/ccardellino/sbwce/$corpus \
-        ../../resources/word_vectors/$corpus.wordvectors.svd.pkl
+        ../resources/word_vectors/$corpus.wordvectors.svd.pkl
 done

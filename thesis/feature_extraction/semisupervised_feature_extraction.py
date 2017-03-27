@@ -111,11 +111,11 @@ if __name__ == '__main__':
     print('Getting instances', file=sys.stderr)
 
     corpora_files = sh.find(args.corpus, '-type', 'f').strip().split('\n')
-    for corpus_file in corpora_files:
+    for corpus_file in tqdm(corpora_files):
         corpus_file = corpus_file.strip()
         parser = ColumnCorpusParser(corpus_file, *_CORPUS_COLUMNS[_LANGUAGE[args.corpus_language]])
 
-        for sentence in tqdm(parser.sentences, total=args.total_sentences):
+        for sentence in tqdm(parser.sentences):
             for word in (word for word in sentence if word.tag.startswith('VM') and word.lemma in valid_lemmas
                          and valid_lemmas[word.lemma] < int(args.max_instances / len(corpora_files)) + 1):
                 valid_lemmas[word.lemma] += 1

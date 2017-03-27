@@ -121,8 +121,10 @@ class HandcraftedFeaturesExtractor(object):
 
 
 class HandcraftedHashedFeaturesExtractor(HandcraftedFeaturesExtractor):
-    def __init__(self, n_features=2**13, dtype=np.float32, non_negative=True, **features):
+    def __init__(self, n_features=2**13, dtype=np.float32, non_negative=True,
+                 return_features_dict=False, **features):
         super(HandcraftedHashedFeaturesExtractor, self).__init__(**features)
+        self._return_features_dict = return_features_dict
         self._hasher = FeatureHasher(n_features=n_features, dtype=dtype, non_negative=non_negative)
 
     def instantiate_sentence(self, sentence):
@@ -133,4 +135,7 @@ class HandcraftedHashedFeaturesExtractor(HandcraftedFeaturesExtractor):
         """
         features_dict = super(HandcraftedHashedFeaturesExtractor, self).instantiate_sentence(sentence)
 
-        return self._hasher.transform([features_dict])
+        if self._return_features_dict:
+            return features_dict, self._hasher.transform([features_dict])
+        else:
+            return self._hasher.transform([features_dict])

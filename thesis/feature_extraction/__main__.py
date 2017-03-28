@@ -5,6 +5,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 import argparse
 import numpy as np
 import os
+import pickle
 import shutil
 import sys
 
@@ -70,6 +71,9 @@ if __name__ == '__main__':
                         nargs='+',
                         default=[],
                         help='Features to ignore.')
+    parser.add_argument('--save_instance_features',
+                        action='store_true',
+                        help='Whether to save the instance features dictionary.')
 
     args = parser.parse_args()
 
@@ -88,6 +92,7 @@ if __name__ == '__main__':
             print('WARNING: Ignoring `windowizer` option in favor of hashing', file=sys.stderr)
         extractor = HandcraftedHashedFeaturesExtractor(
             n_features=args.hashed_features,
+            return_features_dict=args.save_instance_features,
             non_negative=not args.negative_hash,
             **features)
     elif args.windowizer:
@@ -105,6 +110,7 @@ if __name__ == '__main__':
     os.makedirs(args.save_path)
 
     instances = defaultdict(list)
+    instances_features = defaultdict(list)
     labels = defaultdict(list)
     sentences_id = defaultdict(list)
     corpus_lemmas = defaultdict(list)
@@ -119,7 +125,12 @@ if __name__ == '__main__':
         label = '%s.%s.%s' % (getattr(sentence, 'lemma_tag', 'v'), sentence.main_lemma, sentence.sense)
         corpus = 'nonverb.%s' % sentence.corpus if not label.startswith('v') else sentence.corpus
 
-        instances[corpus].append(extractor.instantiate_sentence(sentence))
+        if args.save_instance_features:
+            instance_features, instance = extractor.instantiate_sentence(sentence)
+            instances[corpus].append(instance)
+            instances_features[corpus].append(instance_features)
+        else:
+            instances[corpus].append(extractor.instantiate_sentence(sentence))
         labels[corpus].append(label)
         sentences_id[corpus].append(sentence.sentence_index)
         corpus_lemmas[corpus].append(sentence.main_lemma)
@@ -154,5 +165,8 @@ if __name__ == '__main__':
                                 data=matrix.data, indices=matrix.indices, indptr=matrix.indptr,
                                 shape=matrix.shape, target=target, train_classes=sorted(train_classes),
                                 sentences=sentences, lemmas=lemmas)
+            if args.save_instance_features:
+                with open(os.path.join(args.save_path, '%s_features.p' % corpus), 'wb') as f:
+                    pickle.dump(instances_features[corpus], f)
 
     print('Finished', file=sys.stderr)

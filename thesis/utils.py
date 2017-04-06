@@ -9,6 +9,8 @@ import os
 SENSEM_COLUMNS = ('idx', 'token', 'lemma', 'tag', 'morpho_info', 'ner', 'dep_head', 'dep_rel')
 SEMEVAL_COLUMNS = ('idx', 'token', 'lemma', 'tag', 'ner', 'dep_head', 'dep_rel')
 
+RANDOM_SEED = 1234
+
 
 def find(path, pattern):
     """

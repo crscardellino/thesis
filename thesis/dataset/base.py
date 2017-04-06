@@ -10,7 +10,7 @@ from gensim.models import Word2Vec
 from scipy.sparse import csr_matrix
 
 
-_InstanceId = namedtuple('InstanceId', 'corpu file sentence lemma idx')
+_InstanceId = namedtuple('InstanceId', 'corpus file sentence lemma idx')
 
 
 class CorpusDataset(object):
@@ -35,13 +35,41 @@ class CorpusDataset(object):
 
             self._input_vector_size = self._data.shape[1] * self._word_vector_size
 
+        self._lemmas = None
+        self._unique_lemmas = None
         self.dtype = dtype
+
+    def _word_window_to_vector(self, word_window):
+        vector = []
+
+        for word in word_window:
+            try:
+                vector.append(self._word_vector_model[next(t for t in word if t in self._word_vector_model)])
+            except StopIteration:
+                vector.append(np.zeros(self._word_vector_size, dtype=self.dtype))
+
+        return np.concatenate(vector)
+
+    def data(self, lemma=None, limit=0):
+        data = self._data if lemma is None else self._data[np.where(self._lemmas == lemma)[0], :]
+
+        if self._word_vector_model is not None:
+            data = np.array([self._word_window_to_vector(ww) for ww in data])
+
+        if limit > 0:
+            data = data[:limit, :]
+
+        return data
 
     def input_vector_size(self):
         return self._input_vector_size
 
-    def num_examples(self):
-        return self._data.shape[0]
+    def num_examples(self, lemma=None):
+        return self.data(lemma).shape[0]
+
+    @property
+    def num_lemmas(self):
+        return self._unique_lemmas.shape[0]
 
 
 class SenseCorpusDataset(CorpusDataset):
@@ -65,37 +93,33 @@ class SenseCorpusDataset(CorpusDataset):
 
             self._input_vector_size = self._data.shape[1] * self._word_vector_size
 
-        self._target = dataset['target']
-
         self._lemmas = dataset['lemmas']
         self._unique_lemmas = np.unique(self._lemmas)
+        self._target = dataset['target']
         self._sentences = dataset['sentences']
         self._train_classes = dataset['train_classes']
 
-    def _word_window_to_vector(self, word_window):
-        vector = []
-
-        for word in word_window:
-            try:
-                vector.append(self._word_vector_model[next(t for t in word if t in self._word_vector_model)])
-            except StopIteration:
-                vector.append(np.zeros(self._word_vector_size, dtype=self.dtype))
-
-        return np.concatenate(vector)
-
-    def data(self, lemma=None):
+    def data(self, lemma=None, limit=0):
         data = self._data if lemma is None else self._data[np.where(self._lemmas == lemma)[0], :]
 
         if self._word_vector_model is not None:
             data = np.array([self._word_window_to_vector(ww) for ww in data])
 
+        if limit > 0:
+            data = data[:limit, :]
+
         return data
 
-    def target(self, lemma=None):
+    def target(self, lemma=None, limit=0):
         if lemma is None:
-            return self._target
+            target = self._target
         else:
-            return self._target[np.where(self._lemmas == lemma)[0]]
+            target = self._target[np.where(self._lemmas == lemma)[0]]
+
+        if limit > 0:
+            target = target[:limit, :]
+
+        return target
 
     def traverse_dataset_by_lemma(self):
         for lemma in self._unique_lemmas:
@@ -116,7 +140,8 @@ class SenseCorpusDataset(CorpusDataset):
 
 
 class SenseCorpusDatasets(object):
-    def __init__(self, train_dataset_path, test_dataset_path, word_vector_model_path=None, dtype=np.float32):
+    def __init__(self, train_dataset_path, test_dataset_path, train_features_dict_path=None,
+                 test_features_dict_path=None, word_vector_model_path=None, dtype=np.float32):
         try:
             word_vector_model = Word2Vec.load_word2vec_format(word_vector_model_path, binary=True)\
                 if word_vector_model_path is not None else None
@@ -124,8 +149,8 @@ class SenseCorpusDatasets(object):
             with open(word_vector_model_path, 'rb') as fvectors:
                 word_vector_model = pickle.load(fvectors)
 
-        self.train_dataset = SenseCorpusDataset(train_dataset_path, word_vector_model, dtype)
-        self.test_dataset = SenseCorpusDataset(test_dataset_path, word_vector_model, dtype)
+        self.train_dataset = SenseCorpusDataset(train_dataset_path, train_features_dict_path, word_vector_model, dtype)
+        self.test_dataset = SenseCorpusDataset(test_dataset_path, test_features_dict_path, word_vector_model, dtype)
 
 
 class UnlabeledCorpusDataset(CorpusDataset):
@@ -134,3 +159,5 @@ class UnlabeledCorpusDataset(CorpusDataset):
         super(UnlabeledCorpusDataset, self).__init__(dataset, features_dict_path, word_vector_model, dtype)
 
         self.instances_id = [_InstanceId(*iid.split(':')) for iid in dataset['instances_id']]
+        self._lemmas = np.array([iid.lemma for iid in self.instances_id])
+        self._unique_lemmas = np.unique(self._lemmas)

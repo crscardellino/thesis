@@ -187,7 +187,8 @@ if __name__ == '__main__':
         config['layers'] = [args.layers] if isinstance(args.layers, int) else args.layers
 
     print('Loading data', file=sys.stderr)
-    datasets = SenseCorpusDatasets(args.train_dataset, args.test_dataset, args.word_vectors_model_path)
+    datasets = SenseCorpusDatasets(args.train_dataset, args.test_dataset,
+                                   word_vector_model_path=args.word_vectors_model_path)
 
     results = []
 

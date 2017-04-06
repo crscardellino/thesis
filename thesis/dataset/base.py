@@ -14,18 +14,31 @@ _InstanceId = namedtuple('InstanceId', 'corpus file sentence lemma idx')
 
 
 class CorpusDataset(object):
-    def __init__(self, dataset, feature_dict_path=None, word_vector_model=None, dtype=np.float32):
+    def __init__(self, dataset, feature_dict_path=None, word_vector_model=None,
+                 dataset_extra=None, dtype=np.float32):
         if feature_dict_path is not None:
             with open(feature_dict_path, 'rb') as f:
                 self._features_dict = pickle.load(f)
 
-        if word_vector_model is None:
+        if word_vector_model is None or dataset_extra is not None:
             self._data = csr_matrix((dataset['data'], dataset['indices'], dataset['indptr']),
                                     shape=dataset['shape'], dtype=dtype)
             self._input_vector_size = self._data.shape[1]
+            self._data_extra = None
             self._word_vector_model = None
+
+            if dataset_extra is not None:
+                self._data_extra = dataset_extra['data']
+                self._word_vector_model = word_vector_model
+                try:
+                    self._word_vector_size = self._word_vector_model.vector_size
+                except AttributeError:
+                    self._word_vector_size = next(iter(self._word_vector_model.values())).shape[0]
+
+                self._input_vector_size += self._data_extra.shape[1] * self._word_vector_size
         else:
             self._data = dataset['data']
+            self._data_extra = None
             self._word_vector_model = word_vector_model
 
             try:
@@ -52,12 +65,20 @@ class CorpusDataset(object):
 
     def data(self, lemma=None, limit=0):
         data = self._data if lemma is None else self._data[np.where(self._lemmas == lemma)[0], :]
+        extra_data = None
 
         if self._word_vector_model is not None:
-            data = np.array([self._word_window_to_vector(ww) for ww in data])
+            if self._data_extra is None:
+                data = np.array([self._word_window_to_vector(ww) for ww in data])
+            else:
+                extra_data = self._data_extra if lemma is None else self._data[np.where(self._lemmas == lemma)[0], :]
+                extra_data = np.array([self._word_window_to_vector(ww) for ww in extra_data])
 
         if limit > 0:
             data = data[:limit, :]
+            if extra_data is not None:
+                extra_data = extra_data[:limit, :]
+                data = np.hstack((data.toarray(), extra_data))
 
         return data
 
@@ -73,25 +94,11 @@ class CorpusDataset(object):
 
 
 class SenseCorpusDataset(CorpusDataset):
-    def __init__(self, dataset_path, features_dict_path=None, word_vector_model=None, dtype=np.float32):
+    def __init__(self, dataset_path, features_dict_path=None, word_vector_model=None,
+                 dataset_extra=None, dtype=np.float32):
         dataset = np.load(dataset_path)
-        super(SenseCorpusDataset, self).__init__(dataset, features_dict_path, word_vector_model, dtype)
-
-        if word_vector_model is None:
-            self._data = csr_matrix((dataset['data'], dataset['indices'], dataset['indptr']),
-                                    shape=dataset['shape'], dtype=dtype)
-            self._input_vector_size = self._data.shape[1]
-            self._word_vector_model = None
-        else:
-            self._data = dataset['data']
-            self._word_vector_model = word_vector_model
-
-            try:
-                self._word_vector_size = self._word_vector_model.vector_size
-            except AttributeError:
-                self._word_vector_size = next(iter(self._word_vector_model.values())).shape[0]
-
-            self._input_vector_size = self._data.shape[1] * self._word_vector_size
+        dataset_extra = np.load(dataset_extra) if dataset_extra is not None else None
+        super(SenseCorpusDataset, self).__init__(dataset, features_dict_path, word_vector_model, dataset_extra, dtype)
 
         self._lemmas = dataset['lemmas']
         self._unique_lemmas = np.unique(self._lemmas)
@@ -141,7 +148,8 @@ class SenseCorpusDataset(CorpusDataset):
 
 class SenseCorpusDatasets(object):
     def __init__(self, train_dataset_path, test_dataset_path, train_features_dict_path=None,
-                 test_features_dict_path=None, word_vector_model_path=None, dtype=np.float32):
+                 test_features_dict_path=None, word_vector_model_path=None,
+                 train_dataset_extra=None, test_dataset_extra=None, dtype=np.float32):
         try:
             word_vector_model = Word2Vec.load_word2vec_format(word_vector_model_path, binary=True)\
                 if word_vector_model_path is not None else None

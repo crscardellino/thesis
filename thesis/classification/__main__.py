@@ -163,6 +163,16 @@ if __name__ == '__main__':
                         type=str,
                         default=None,
                         help='Path to the word vectors file in case of using one.')
+    parser.add_argument('--train_dataset_extra',
+                        type=str,
+                        default=None,
+                        help='If given, it uses the train dataset as an extra to merge with ' +
+                             'the original datset (useful to add word vectors to handcrafted features)')
+    parser.add_argument('--test_dataset_extra',
+                        type=str,
+                        default=None,
+                        help='If given, it uses the test dataset as an extra to merge with ' +
+                             'the original datset (useful to add word vectors to handcrafted features)')
 
     args = parser.parse_args()
 

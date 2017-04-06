@@ -106,17 +106,6 @@ class SenseCorpusDataset(CorpusDataset):
         self._sentences = dataset['sentences']
         self._train_classes = dataset['train_classes']
 
-    def data(self, lemma=None, limit=0):
-        data = self._data if lemma is None else self._data[np.where(self._lemmas == lemma)[0], :]
-
-        if self._word_vector_model is not None:
-            data = np.array([self._word_window_to_vector(ww) for ww in data])
-
-        if limit > 0:
-            data = data[:limit, :]
-
-        return data
-
     def target(self, lemma=None, limit=0):
         if lemma is None:
             target = self._target

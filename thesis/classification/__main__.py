@@ -198,7 +198,9 @@ if __name__ == '__main__':
 
     print('Loading data', file=sys.stderr)
     datasets = SenseCorpusDatasets(args.train_dataset, args.test_dataset,
-                                   word_vector_model_path=args.word_vectors_model_path)
+                                   word_vector_model_path=args.word_vectors_model_path,
+                                   train_dataset_extra=args.train_dataset_extra,
+                                   test_dataset_extra=args.test_dataset_extra)
 
     results = []
 

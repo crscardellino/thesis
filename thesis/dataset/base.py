@@ -157,8 +157,10 @@ class SenseCorpusDatasets(object):
             with open(word_vector_model_path, 'rb') as fvectors:
                 word_vector_model = pickle.load(fvectors)
 
-        self.train_dataset = SenseCorpusDataset(train_dataset_path, train_features_dict_path, word_vector_model, dtype)
-        self.test_dataset = SenseCorpusDataset(test_dataset_path, test_features_dict_path, word_vector_model, dtype)
+        self.train_dataset = SenseCorpusDataset(train_dataset_path, train_features_dict_path,
+                                                word_vector_model, train_dataset_extra, dtype)
+        self.test_dataset = SenseCorpusDataset(test_dataset_path, test_features_dict_path,
+                                               word_vector_model, test_dataset_extra, dtype)
 
 
 class UnlabeledCorpusDataset(CorpusDataset):

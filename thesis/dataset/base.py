@@ -71,7 +71,8 @@ class CorpusDataset(object):
             if self._data_extra is None:
                 data = np.array([self._word_window_to_vector(ww) for ww in data])
             else:
-                extra_data = self._data_extra if lemma is None else self._data[np.where(self._lemmas == lemma)[0], :]
+                extra_data = self._data_extra if lemma is None \
+                    else self._data_extra[np.where(self._lemmas == lemma)[0], :]
                 extra_data = np.array([self._word_window_to_vector(ww) for ww in extra_data])
 
         if limit > 0:

@@ -5,13 +5,49 @@ from __future__ import absolute_import, unicode_literals
 import numpy as np
 import pickle
 
+from collections import namedtuple
 from gensim.models import Word2Vec
 from scipy.sparse import csr_matrix
 
 
-class SenseCorpusDataset(object):
-    def __init__(self, dataset_path, word_vector_model=None, dtype=np.float32):
+_InstanceId = namedtuple('InstanceId', 'corpu file sentence lemma idx')
+
+
+class CorpusDataset(object):
+    def __init__(self, dataset, feature_dict_path=None, word_vector_model=None, dtype=np.float32):
+        if feature_dict_path is not None:
+            with open(feature_dict_path, 'rb') as f:
+                self._features_dict = pickle.load(f)
+
+        if word_vector_model is None:
+            self._data = csr_matrix((dataset['data'], dataset['indices'], dataset['indptr']),
+                                    shape=dataset['shape'], dtype=dtype)
+            self._input_vector_size = self._data.shape[1]
+            self._word_vector_model = None
+        else:
+            self._data = dataset['data']
+            self._word_vector_model = word_vector_model
+
+            try:
+                self._word_vector_size = self._word_vector_model.vector_size
+            except AttributeError:
+                self._word_vector_size = next(iter(self._word_vector_model.values())).shape[0]
+
+            self._input_vector_size = self._data.shape[1] * self._word_vector_size
+
+        self.dtype = dtype
+
+    def input_vector_size(self):
+        return self._input_vector_size
+
+    def num_examples(self):
+        return self._data.shape[0]
+
+
+class SenseCorpusDataset(CorpusDataset):
+    def __init__(self, dataset_path, features_dict_path=None, word_vector_model=None, dtype=np.float32):
         dataset = np.load(dataset_path)
+        super(SenseCorpusDataset, self).__init__(dataset, features_dict_path, word_vector_model, dtype)
 
         if word_vector_model is None:
             self._data = csr_matrix((dataset['data'], dataset['indices'], dataset['indptr']),
@@ -35,7 +71,6 @@ class SenseCorpusDataset(object):
         self._unique_lemmas = np.unique(self._lemmas)
         self._sentences = dataset['sentences']
         self._train_classes = dataset['train_classes']
-        self.dtype = dtype
 
     def _word_window_to_vector(self, word_window):
         vector = []
@@ -66,9 +101,6 @@ class SenseCorpusDataset(object):
         for lemma in self._unique_lemmas:
             yield lemma, self.data(lemma), self.target(lemma)
 
-    def input_vector_size(self):
-        return self._input_vector_size
-
     def output_vector_size(self, lemma=None):
         if lemma is None:
             return self._train_classes.shape[0]
@@ -94,3 +126,11 @@ class SenseCorpusDatasets(object):
 
         self.train_dataset = SenseCorpusDataset(train_dataset_path, word_vector_model, dtype)
         self.test_dataset = SenseCorpusDataset(test_dataset_path, word_vector_model, dtype)
+
+
+class UnlabeledCorpusDataset(CorpusDataset):
+    def __init__(self, dataset_path, features_dict_path=None, word_vector_model=None, dtype=np.float32):
+        dataset = np.load(dataset_path)
+        super(UnlabeledCorpusDataset, self).__init__(dataset, features_dict_path, word_vector_model, dtype)
+
+        self.instances_id = [_InstanceId(*iid.split(':')) for iid in dataset['instances_id']]

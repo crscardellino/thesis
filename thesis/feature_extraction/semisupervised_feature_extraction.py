@@ -104,7 +104,7 @@ if __name__ == '__main__':
 
     with open(args.corpus_labels, 'rb') as f:
         valid_lemmas = pickle.load(f)
-        valid_lemmas = {lemma: 0 for lemma, (_, count) in
+        valid_lemmas = {lemma for lemma, (_, count) in
                         valid_lemmas[_LANGUAGE[args.corpus_language]]['lemmas'].items()
                         if count[count >= 3].shape[0] > 1}
 
@@ -114,11 +114,12 @@ if __name__ == '__main__':
     for corpus_file in tqdm(corpora_files):
         corpus_file = corpus_file.strip()
         parser = ColumnCorpusParser(corpus_file, *_CORPUS_COLUMNS[_LANGUAGE[args.corpus_language]])
+        lemmas_for_corpus = {lemma: 0 for lemma in valid_lemmas}
 
         for sentence in tqdm(parser.sentences):
             for word in (word for word in sentence if word.tag.startswith('VM') and word.lemma in valid_lemmas
-                         and valid_lemmas[word.lemma] < int(args.max_instances / len(corpora_files)) + 1):
-                valid_lemmas[word.lemma] += 1
+                         and lemmas_for_corpus[word.lemma] < int(args.max_instances / len(corpora_files)) + 1):
+                lemmas_for_corpus[word.lemma] += 1
                 sentence['main_lemma'] = word.lemma
                 sentence['main_lemma_index'] = word.idx
 

@@ -18,7 +18,7 @@ class CorpusDataset(object):
                  dataset_extra=None, dtype=np.float32):
         if feature_dict_path is not None:
             with open(feature_dict_path, 'rb') as f:
-                self._features_dict = pickle.load(f)
+                self._features_dicts = pickle.load(f)
 
         if word_vector_model is None or dataset_extra is not None:
             self._data = csr_matrix((dataset['data'], dataset['indices'], dataset['indptr']),
@@ -93,6 +93,22 @@ class CorpusDataset(object):
     def num_lemmas(self):
         return self._unique_lemmas.shape[0]
 
+    @property
+    def word_vector_model(self):
+        return self._word_vector_model
+
+    def features_dictionaries(self, lemma=None, limit=0):
+        if lemma is None:
+            features_dict = self._features_dicts
+        else:
+            instances = set(np.where(self._lemmas == lemma)[0])
+            features_dict = [fd for idx, fd in enumerate(self._features_dicts) if idx in instances]
+
+        if limit > 0:
+            features_dict = features_dict[:limit]
+
+        return features_dict
+
 
 class SenseCorpusDataset(CorpusDataset):
     def __init__(self, dataset_path, features_dict_path=None, word_vector_model=None,
@@ -118,9 +134,12 @@ class SenseCorpusDataset(CorpusDataset):
 
         return target
 
-    def traverse_dataset_by_lemma(self):
+    def traverse_dataset_by_lemma(self, return_features=False):
         for lemma in self._unique_lemmas:
-            yield lemma, self.data(lemma), self.target(lemma)
+            if return_features:
+                yield lemma, self.data(lemma), self.target(lemma), self.features_dictionaries(lemma)
+            else:
+                yield lemma, self.data(lemma), self.target(lemma)
 
     def output_vector_size(self, lemma=None):
         if lemma is None:
@@ -134,6 +153,10 @@ class SenseCorpusDataset(CorpusDataset):
     @property
     def num_lemmas(self):
         return self._unique_lemmas.shape[0]
+
+    @property
+    def train_classes(self):
+        return self._train_classes
 
 
 class SenseCorpusDatasets(object):
@@ -154,10 +177,24 @@ class SenseCorpusDatasets(object):
 
 
 class UnlabeledCorpusDataset(CorpusDataset):
-    def __init__(self, dataset_path, features_dict_path=None, word_vector_model=None, dtype=np.float32):
+    def __init__(self, dataset_path, features_dict_path=None, word_vector_model=None,
+                 dataset_extra=None, dtype=np.float32):
         dataset = np.load(dataset_path)
-        super(UnlabeledCorpusDataset, self).__init__(dataset, features_dict_path, word_vector_model, dtype)
+        super(UnlabeledCorpusDataset, self).__init__(dataset, features_dict_path, word_vector_model,
+                                                     dataset_extra, dtype)
 
-        self.instances_id = [_InstanceId(*iid.split(':')) for iid in dataset['instances_id']]
-        self._lemmas = np.array([iid.lemma for iid in self.instances_id])
+        self._instances_id = [_InstanceId(*iid.split(':')) for iid in dataset['instances_id']]
+        self._lemmas = np.array([iid.lemma for iid in self._instances_id])
         self._unique_lemmas = np.unique(self._lemmas)
+
+    def instances_id(self, lemma=None, limit=0):
+        if lemma is None:
+            instances_id = self._instances_id
+        else:
+            instances = set(np.where(self._lemmas == lemma)[0])
+            instances_id = [iid for idx, iid in enumerate(self._instances_id) if idx in instances]
+
+        if limit > 0:
+            instances_id = instances_id[:limit]
+
+        return instances_id

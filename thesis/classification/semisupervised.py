@@ -248,6 +248,7 @@ if __name__ == '__main__':
     unlabeled_dataset_extra = os.path.join(args.unlabeled_dataset_extra, 'dataset.npz')\
         if args.unlabeled_dataset_extra is not None else None
 
+    print('Loading labeled dataset', file=sys.stderr)
     labeled_datasets = SenseCorpusDatasets(train_dataset_path=labeled_dataset % 'train',
                                            train_features_dict_path=labeled_features % 'train',
                                            test_dataset_path=labeled_dataset % 'test',
@@ -257,6 +258,8 @@ if __name__ == '__main__':
                                            if labeled_extra is not None else None,
                                            test_dataset_extra=labeled_extra % 'test'
                                            if labeled_extra is not None else None)
+
+    print('Loading unlabeled dataset', file=sys.stderr)
     unlabeled_dataset = UnlabeledCorpusDataset(dataset_path=unlabeled_dataset,
                                                features_dict_path=unlabeled_features,
                                                word_vector_model=labeled_datasets.train_dataset.word_vector_model,
@@ -266,6 +269,7 @@ if __name__ == '__main__':
     certainty_progression = []
     features_progression = []
 
+    print('Running experiments per lemma', file=sys.stderr)
     for lemma, data, target, features in \
             tqdm(labeled_datasets.train_dataset.traverse_dataset_by_lemma(return_features=True)):
         try:

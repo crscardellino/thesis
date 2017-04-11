@@ -77,16 +77,15 @@ class SemiSupervisedWrapper(object):
 
         # Sort the candidate probabilities according to the selection method
         if self._candidates_selection == 'min':
-            candidate_indices = np.argsort(max_probabilities)
+            candidates = max_probabilities.argsort()
         elif self._candidates_selection == 'max':
-            candidate_indices = np.argsort(max_probabilities)[::-1]
+            candidates = max_probabilities.argsort()[::-1]
         elif self._candidates_selection == 'random':
-            candidate_indices = np.random.permutation(max_probabilities.shape[0])
+            candidates = np.random.permutation(max_probabilities.shape[0])
         else:
-            raise ValueError('Not a valida candidate selection method: %s' % self._candidates_selection)
+            raise ValueError('Not a valid candidate selection method: %s' % self._candidates_selection)
 
         # Select the candidates, limiting them in case of an existing limit
-        candidates = max_probabilities[candidate_indices]
         if self._candidates_limit > 0:
             candidates = candidates[:self._candidates_limit]
 

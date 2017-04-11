@@ -14,7 +14,7 @@ def filter_minimum(target, min_count=2, invalid_target=-1):
     target = target[valid_targets]
 
     labels, counts = np.unique(target, return_counts=True)
-    over_minimum_count = np.where(counts >= min_count)
+    over_minimum_count = np.where(counts >= min_count)[0]
 
     if over_minimum_count.shape[0] < 2:
         raise ValueError('Not enough labels to cover minimum count')

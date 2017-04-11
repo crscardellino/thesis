@@ -9,6 +9,7 @@ import os
 import pandas as pd
 import scipy.sparse as sps
 import sys
+import tensorflow as tf
 
 from sklearn.metrics import log_loss
 from sklearn.svm import SVC
@@ -204,7 +205,7 @@ if __name__ == '__main__':
     parser.add_argument('--word_vector_model_path', default=None)
     parser.add_argument('--labeled_dataset_extra', default=None)
     parser.add_argument('--unlabeled_dataset_extra', default=None)
-    parser.add_argument('--classifier', type=str, default='decision_tree')
+    parser.add_argument('--classifier', type=str, default='svm')
     parser.add_argument('--classifier_config_file', type=str, default=None)
     parser.add_argument('--classifier_config', type=lambda config: tuple(config.split('=')),
                         default=list(), nargs='+')
@@ -239,8 +240,8 @@ if __name__ == '__main__':
     if args.layers:
         config['layers'] = [args.layers] if isinstance(args.layers, int) else args.layers
 
-    labeled_dataset = os.path.join(args.labeled_dataset, '%s_dataset.npz')
-    labeled_features = os.path.join(args.labeled_dataset, '%s_features.p')
+    labeled_dataset = os.path.join(args.labeled_dataset_path, '%s_dataset.npz')
+    labeled_features = os.path.join(args.labeled_dataset_path, '%s_features.p')
     labeled_extra = os.path.join(args.labeled_dataset_extra, '%s_dataset.npz')\
         if args.labeled_dataset_extra is not None else None
     unlabeled_dataset = os.path.join(args.unlabeled_dataset_path, 'dataset.npz')
@@ -267,33 +268,35 @@ if __name__ == '__main__':
     for lemma, data, target, features in \
             tqdm(labeled_datasets.train_dataset.traverse_dataset_by_lemma(return_features=True)):
         try:
-            semisupervised = SemiSupervisedWrapper(
-                labeled_train_data=data, labeled_train_target=target,
-                labeled_test_data=labeled_datasets.test_dataset.data(lemma),
-                labeled_test_target=labeled_datasets.test_dataset.target(lemma),
-                unlabeled_data=unlabeled_dataset.data(lemma, limit=args.unlabeled_data_limit),
-                labeled_features=features, min_count=args.min_count, validation_ratio=args.validation_ratio,
-                acceptance_threshold=args.acceptance_threshold, candidates_selection=args.candidates_selection,
-                unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
-                candidates_limit=args.candidates_limit, error_sigma=args.error_sigma, random_seed=args.random_seed)
+            tf.reset_default_graph()
+            with tf.Session() as sess:
+                semisupervised = SemiSupervisedWrapper(
+                    labeled_train_data=data, labeled_train_target=target,
+                    labeled_test_data=labeled_datasets.test_dataset.data(lemma),
+                    labeled_test_target=labeled_datasets.test_dataset.target(lemma),
+                    unlabeled_data=unlabeled_dataset.data(lemma, limit=args.unlabeled_data_limit),
+                    labeled_features=features, min_count=args.min_count, validation_ratio=args.validation_ratio,
+                    acceptance_threshold=args.acceptance_threshold, candidates_selection=args.candidates_selection,
+                    unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
+                    candidates_limit=args.candidates_limit, error_sigma=args.error_sigma, random_seed=args.random_seed)
 
-            semisupervised.run(_CLASSIFIERS[args.classifier], config)
-            pr, cp, fp = semisupervised.get_results()
-            pr.insert(0, 'lemma', lemma)
-            cp.insert(0, 'lemma', lemma)
-            fp.insert(0, 'lemma', lemma)
-            prediction_results.append(pr)
-            certainty_progression.append(cp)
-            features_progression.append(fp)
+                semisupervised.run(_CLASSIFIERS[args.classifier], config)
+                pr, cp, fp = semisupervised.get_results()
+                pr.insert(0, 'lemma', lemma)
+                cp.insert(0, 'lemma', lemma)
+                fp.insert(0, 'lemma', lemma)
+                prediction_results.append(pr)
+                certainty_progression.append(cp)
+                features_progression.append(fp)
 
-            # Save the bootstrapped data
-            bootstrapped_indices, bootstrapped_target = semisupervised.bootstrapped()
-            unlabeled_instances = [':'.join(ui) for idx, ui in
-                                   enumerate(unlabeled_dataset.instances_id(lemma, limit=args.unlabeled_data_limit))
-                                   if idx in set(bootstrapped_indices)]
+                # Save the bootstrapped data
+                bootstrapped_indices, bootstrapped_target = semisupervised.bootstrapped()
+                unlabeled_instances = [':'.join(ui) for idx, ui in
+                                       enumerate(unlabeled_dataset.instances_id(lemma, limit=args.unlabeled_data_limit))
+                                       if idx in set(bootstrapped_indices)]
 
-            pd.DataFrame({'instance': unlabeled_instances, 'predicted_target': bootstrapped_target})\
-                .to_csv('%s_unlabeled_dataset_predictions.csv' % args.base_results_path, index=False)
+                pd.DataFrame({'instance': unlabeled_instances, 'predicted_target': bootstrapped_target})\
+                    .to_csv('%s_unlabeled_dataset_predictions.csv' % args.base_results_path, index=False)
         except ValueError:
             tqdm.write('The lemma %s doesn\'t have enough senses with at least %d occurrences' % (lemma, 2),
                        file=sys.stderr)

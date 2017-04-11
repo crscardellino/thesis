@@ -254,8 +254,10 @@ if __name__ == '__main__':
                                            test_dataset_path=labeled_dataset % 'test',
                                            test_features_dict_path=labeled_features % 'test',
                                            word_vector_model_path=args.word_vector_model_path,
-                                           train_dataset_extra=labeled_extra % 'train',
-                                           test_dataset_extra=labeled_extra % 'test')
+                                           train_dataset_extra=labeled_extra % 'train'
+                                           if labeled_extra is not None else None,
+                                           test_dataset_extra=labeled_extra % 'test'
+                                           if labeled_extra is not None else None)
     unlabeled_dataset = UnlabeledCorpusDataset(dataset_path=unlabeled_dataset,
                                                features_dict_path=unlabeled_features,
                                                word_vector_model=labeled_datasets.train_dataset.word_vector_model,

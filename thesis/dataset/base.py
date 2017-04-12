@@ -198,3 +198,6 @@ class UnlabeledCorpusDataset(CorpusDataset):
             instances_id = instances_id[:limit]
 
         return instances_id
+
+    def has_lemma(self, lemma):
+        return lemma in set(self._unique_lemmas)

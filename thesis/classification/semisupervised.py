@@ -91,7 +91,7 @@ class SemiSupervisedWrapper(object):
 
         # If there is an acceptance threshold filter out candidates that doesn't comply it
         if self._acceptance_threshold > 0:
-            over_threshold = np.where(max_probabilities[candidates] >= self._acceptance_threshold)[0]
+            over_threshold = np.where(max_probabilities[candidates].round(2) >= self._acceptance_threshold)[0]
             candidates = candidates[over_threshold]
 
         return candidates
@@ -123,7 +123,8 @@ class SemiSupervisedWrapper(object):
         # Calculate cross entropy error (perhaps better with the algorithm by itself)
         # and update the results of the iteration giving the predictions
         error = log_loss(target, self._model.predict_proba(data), labels=self._labels)
-        results = pd.DataFrame({'true': target, 'prediction': self._model.predict(data)})
+        results = pd.DataFrame({'true': target.astype(np.int32),
+                                'prediction': self._model.predict(data).astype(np.int32)})
         results.insert(0, 'error', error)
         results.insert(0, 'iteration', iteration)
         results.insert(0, 'corpus_split', corpus_split)
@@ -154,18 +155,21 @@ class SemiSupervisedWrapper(object):
 
         iteration = 0
         bootstrap_mask = np.ones(self._unlabeled_data.shape[0], dtype=np.bool)
+        unlabeled_dataset_index = np.arange(self._unlabeled_data.shape[0], dtype=np.int32)
 
         while len(self._bootstrapped_indices) < self._unlabeled_data.shape[0]:
             bootstrap_mask[self._bootstrapped_indices] = False
-            prediction_probabilities = self._model.predict_proba(self._unlabeled_data[bootstrap_mask])
+            masked_unlabeled_data = self._unlabeled_data[bootstrap_mask]
+            prediction_probabilities = self._model.predict_proba(masked_unlabeled_data)
 
             candidates = self._get_candidates(prediction_probabilities)
 
             if len(candidates) == 0:  # Can't get more candidates
-                tqdm.write('No more candidates', file=sys.stderr)
+                tqdm.write('Max predicted probability %.2f - Acceptance threshold: %.2f'
+                           % (prediction_probabilities.max(), self._acceptance_threshold), file=sys.stderr)
                 break
 
-            data_candidates = self._unlabeled_data[candidates]
+            data_candidates = masked_unlabeled_data[candidates]
             target_candidates = self._labels[prediction_probabilities[candidates].argmax(axis=1)]
 
             train_data = (self._labeled_train_data, self._unlabeled_data[self._bootstrapped_indices], data_candidates)
@@ -188,7 +192,7 @@ class SemiSupervisedWrapper(object):
                 break
 
             self._model = new_model
-            self._bootstrapped_indices.extend(candidates)
+            self._bootstrapped_indices.extend(unlabeled_dataset_index[bootstrap_mask][candidates])
             self._bootstrapped_targets.extend(target_candidates)
             iteration += 1
 
@@ -278,12 +282,14 @@ if __name__ == '__main__':
     prediction_results = []
     certainty_progression = []
     features_progression = []
+    bootstrapped_instances = []
+    bootstrapped_targets = []
 
     print('Running experiments per lemma', file=sys.stderr)
     for lemma, data, target, features in \
-            tqdm(labeled_datasets.train_dataset.traverse_dataset_by_lemma(return_features=True)):
+            tqdm(labeled_datasets.train_dataset.traverse_dataset_by_lemma(return_features=True),
+                 total=labeled_datasets.train_dataset.num_lemmas):
         if not unlabeled_dataset.has_lemma(lemma):
-            tqdm.write('Lemma %s not in unlabeled data' % lemma, file=sys.stderr)
             continue
         try:
             tf.reset_default_graph()
@@ -308,14 +314,10 @@ if __name__ == '__main__':
                     features_progression.append(fp)
 
                     # Save the bootstrapped data
-                    bootstrapped_indices, bootstrapped_target = semisupervised.bootstrapped()
-                    unlabeled_instances = [':'.join(ui) for idx, ui in
-                                           enumerate(
-                                               unlabeled_dataset.instances_id(lemma, limit=args.unlabeled_data_limit)
-                                           ) if idx in set(bootstrapped_indices)]
-
-                    pd.DataFrame({'instance': unlabeled_instances, 'predicted_target': bootstrapped_target})\
-                        .to_csv('%s_unlabeled_dataset_predictions.csv' % args.base_results_path, index=False)
+                    bi, bt = semisupervised.bootstrapped()
+                    bootstrapped_targets.extend(bt)
+                    bootstrapped_instances.extend(':'.join(ui) for idx, ui in enumerate(
+                        unlabeled_dataset.instances_id(lemma, limit=args.unlabeled_data_limit)) if idx in set(bi))
                 else:
                     tqdm.write('The lemma %s didn\'t run iterations' % lemma, file=sys.stderr)
         except NotEnoughSensesError:
@@ -324,6 +326,9 @@ if __name__ == '__main__':
             continue
 
     print('Saving results', file=sys.stderr)
+
+    pd.DataFrame({'instance': bootstrapped_instances, 'predicted_target': bootstrapped_targets}) \
+        .to_csv('%s_unlabeled_dataset_predictions.csv' % args.base_results_path, index=False)
     pd.concat(prediction_results, ignore_index=True)\
         .to_csv('%s_prediction_results.csv' % args.base_results_path, index=False, float_format='%.2e')
     pd.concat(certainty_progression, ignore_index=True)\

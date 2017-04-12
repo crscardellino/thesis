@@ -19,6 +19,8 @@ class CorpusDataset(object):
         if feature_dict_path is not None:
             with open(feature_dict_path, 'rb') as f:
                 self._features_dicts = pickle.load(f)
+        else:
+            self._features_dicts = None
 
         if word_vector_model is None or dataset_extra is not None:
             self._data = csr_matrix((dataset['data'], dataset['indices'], dataset['indptr']),
@@ -36,6 +38,14 @@ class CorpusDataset(object):
                     self._word_vector_size = next(iter(self._word_vector_model.values())).shape[0]
 
                 self._input_vector_size += self._data_extra.shape[1] * self._word_vector_size
+
+                # FIXME: This is horrible!
+                for wwidx, word_window in enumerate(self._data_extra):
+                    for widx, word in enumerate(word_window):
+                        for t in word:
+                            if t in self._word_vector_model:
+                                self._features_dicts[wwidx]['vector:word:%d' % widx] = t
+                                break
         else:
             self._data = dataset['data']
             self._data_extra = None
@@ -47,6 +57,15 @@ class CorpusDataset(object):
                 self._word_vector_size = next(iter(self._word_vector_model.values())).shape[0]
 
             self._input_vector_size = self._data.shape[1] * self._word_vector_size
+
+            self._features_dicts = []
+            for word_window in self._data:
+                self._features_dicts.append({})
+                for widx, word in enumerate(word_window):
+                    for t in word:
+                        if t in self._word_vector_model:
+                            self._features_dicts[-1]['vector:word:%d' % widx] = t
+                            break
 
         self._lemmas = None
         self._unique_lemmas = None

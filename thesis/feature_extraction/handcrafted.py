@@ -117,7 +117,7 @@ class HandcraftedFeaturesExtractor(object):
                 dep_word = sentence.get_word_by_index(main_word.dep_head)
                 features_dict['dep:%s:%s:%s' % (main_word.token, main_word.dep_rel, dep_word.token)] += 1
 
-        return features_dict
+        return dict(features_dict)
 
 
 class HandcraftedHashedFeaturesExtractor(HandcraftedFeaturesExtractor):

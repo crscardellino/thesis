@@ -94,11 +94,15 @@ class CorpusDataset(object):
                     else self._data_extra[np.where(self._lemmas == lemma)[0], :]
                 extra_data = np.array([self._word_window_to_vector(ww) for ww in extra_data])
 
+        limit = min(limit, data.shape[0])
+
         if limit > 0:
             data = data[:limit, :]
             if extra_data is not None:
                 extra_data = extra_data[:limit, :]
-                data = np.hstack((data.toarray(), extra_data))
+
+        if extra_data is not None:
+            data = np.hstack((data.toarray(), extra_data))
 
         return data
 
@@ -122,6 +126,8 @@ class CorpusDataset(object):
         else:
             instances = set(np.where(self._lemmas == lemma)[0])
             features_dict = [fd for idx, fd in enumerate(self._features_dicts) if idx in instances]
+
+        limit = min(limit, len(features_dict))
 
         if limit > 0:
             features_dict = features_dict[:limit]
@@ -147,6 +153,8 @@ class SenseCorpusDataset(CorpusDataset):
             target = self._target
         else:
             target = self._target[np.where(self._lemmas == lemma)[0]]
+
+        limit = min(limit, target.shape[0])
 
         if limit > 0:
             target = target[:limit, :]
@@ -199,6 +207,7 @@ class UnlabeledCorpusDataset(CorpusDataset):
     def __init__(self, dataset_path, features_dict_path=None, word_vector_model=None,
                  dataset_extra=None, dtype=np.float32):
         dataset = np.load(dataset_path)
+        dataset_extra = np.load(dataset_extra) if dataset_extra is not None else None
         super(UnlabeledCorpusDataset, self).__init__(dataset, features_dict_path, word_vector_model,
                                                      dataset_extra, dtype)
 
@@ -212,6 +221,8 @@ class UnlabeledCorpusDataset(CorpusDataset):
         else:
             instances = set(np.where(self._lemmas == lemma)[0])
             instances_id = [iid for idx, iid in enumerate(self._instances_id) if idx in instances]
+
+        limit = min(limit, len(instances_id))
 
         if limit > 0:
             instances_id = instances_id[:limit]

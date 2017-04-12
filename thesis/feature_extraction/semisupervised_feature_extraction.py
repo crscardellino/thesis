@@ -114,6 +114,9 @@ if __name__ == '__main__':
     print('Getting instances', file=sys.stderr)
 
     corpora_files = sorted(sh.find(args.corpus, '-type', 'f').strip().split('\n'))
+
+    max_lemma_per_corpus = int(args.max_instances / len(corpora_files)) + 1
+
     for corpus_file in tqdm(corpora_files):
         corpus_file = corpus_file.strip()
         parser = ColumnCorpusParser(corpus_file, *_CORPUS_COLUMNS[_LANGUAGE[args.corpus_language]])
@@ -121,7 +124,7 @@ if __name__ == '__main__':
 
         for sentence in tqdm(parser.sentences):
             for word in (word for word in sentence if word.tag.startswith('VM') and word.lemma in valid_lemmas
-                         and lemmas_for_corpus[word.lemma] < int(args.max_instances / len(corpora_files)) + 1):
+                         and lemmas_for_corpus[word.lemma] < max_lemma_per_corpus):
                 lemmas_for_corpus[word.lemma] += 1
                 sentence['main_lemma'] = word.lemma
                 sentence['main_lemma_index'] = word.idx

@@ -52,18 +52,16 @@ class Word(object):
         """
 
         if self.tag.startswith('F') and self.tag.lower() != 'fw':  # To compatibilize with sbwce
-            return ('<PUNCTUATION>',) * 5
+            return ('<PUNCTUATION>',) * 3
         elif self.tag == 'W':
-            return ('<DATE>',) * 5
+            return ('<DATE>',) * 3
         elif self.tag == 'Z':
-            return ('<NUMBER>',) * 5
+            return ('<NUMBER>',) * 3
         else:
             return (
                 self.token,
                 self.token.lower(),
-                self.lemma,
-                self.token.upper(),
-                self.lemma.upper()
+                self.lemma
             )
 
 

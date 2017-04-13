@@ -104,6 +104,8 @@ class CorpusDataset(object):
         if extra_data is not None:
             data = np.hstack((data.toarray(), extra_data))
 
+        assert data.shape[0] == self._input_vector_size
+
         return data
 
     def input_vector_size(self):

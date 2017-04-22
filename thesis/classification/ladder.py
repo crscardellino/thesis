@@ -61,7 +61,7 @@ class LadderNetworksExperiment(object):
         self._denoising_cost = denoising_cost  # hyperparameters that denote the importance of each layer
 
         # functions to join and split annotated and unannotated corpus
-        self._join = lambda a, u: tf.concat(0, [a, u])
+        self._join = lambda l, u: tf.concat([l, u], 0)
         self._labeled = lambda i: tf.slice(i, [0, 0], [self._batch_size, -1]) if i is not None else i
         self._unlabeled = lambda i: tf.slice(i, [self._batch_size, 0], [-1, -1]) if i is not None else i
         self._split_lu = lambda i: (self._labeled(i), self._unlabeled(i))
@@ -144,7 +144,7 @@ class LadderNetworksExperiment(object):
         # a weight has a shape of the matrix (inputs from previous layers outputs of the next layer)
         # and is initialized as a random normal divided by the lenght of the previous layer.
 
-        shapes = zip(self._layers[:-1], self._layers[1:])
+        shapes = list(zip(self._layers[:-1], self._layers[1:]))
         # the shape of each of the linear layers, is needed to build the structure of the network
 
         # define the weights, randomly initialized at first, for the encoder and the decoder.
@@ -325,7 +325,7 @@ class LadderNetworksExperiment(object):
 
     def run(self):
         with tf.Session() as sess:
-            init = tf.initialize_all_variables()
+            init = tf.global_variables_initializer()
             sess.run(init)
 
             feed_dicts = {
@@ -391,6 +391,7 @@ if __name__ == '__main__':
     parser.add_argument('--evaluation_amount', type=int, default=100)
     parser.add_argument('--min_count', type=int, default=2)
     parser.add_argument('--noise_std', type=float, default=0.3)
+    parser.add_argument('--validation_ratio', type=float, default=0.1)
     parser.add_argument('--learning_rate', type=float, default=0.01)
     parser.add_argument('--random_seed', type=int, default=1234)
 
@@ -399,7 +400,7 @@ if __name__ == '__main__':
     args.layers = [args.layers] if not isinstance(args.layers, list) else args.layers
     args.denoising_cost = [args.denoising_cost] if not isinstance(args.denoising_cost, list) else args.denoising_cost
 
-    if len(args.layers) != len(args.denoising_cost) or len(args.layers) > 0:
+    if len(args.layers) + 2 != len(args.denoising_cost) or len(args.layers) == 0:
         raise ValueError('Not valid layers or denoising cost')
 
     labeled_datasets_path = os.path.join(args.labeled_dataset_path, '%s_dataset.npz')

@@ -40,12 +40,13 @@ class CorpusDataset(object):
                 self._input_vector_size += self._data_extra.shape[1] * self._word_vector_size
 
                 # FIXME: This is horrible!
-                for wwidx, word_window in enumerate(self._data_extra):
-                    for widx, word in enumerate(word_window):
-                        for t in word:
-                            if t in self._word_vector_model:
-                                self._features_dicts[wwidx]['vector:word:%d' % widx] = t
-                                break
+                if self._features_dicts is not None:
+                    for wwidx, word_window in enumerate(self._data_extra):
+                        for widx, word in enumerate(word_window):
+                            for t in word:
+                                if t in self._word_vector_model:
+                                    self._features_dicts[wwidx]['vector:word:%d' % widx] = t
+                                    break
         else:
             self._data = dataset['data']
             self._data_extra = None
@@ -103,6 +104,8 @@ class CorpusDataset(object):
 
         if extra_data is not None:
             data = np.hstack((data.toarray(), extra_data))
+
+        assert data.shape[1] == self._input_vector_size
 
         return data
 

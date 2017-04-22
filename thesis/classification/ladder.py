@@ -244,10 +244,10 @@ class LadderNetworksExperiment(object):
 
             if l == self._L:
                 # use softmax activation in output layer
-                h = tf.nn.softmax(self._weights['gamma'][l-1] * (z + self._weights["beta"][l-1]))
+                h = tf.nn.softmax(self._weights['gamma'][l-1] * (z + self._weights['beta'][l-1]))
             else:
                 # use ReLU activation in hidden layers
-                h = tf.nn.relu(z + self._weights["beta"][l-1])
+                h = tf.nn.relu(z + self._weights['beta'][l-1])
 
             layer_data['annotated']['z'][l], layer_data['unannotated']['z'][l] = self._split_lu(z)
 

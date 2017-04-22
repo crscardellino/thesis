@@ -60,7 +60,7 @@ class LadderNetworksExperiment(object):
         self._noise_std = noise_std  # scaling factor for noise used in corrupted encoder
         self._denoising_cost = denoising_cost  # hyperparameters that denote the importance of each layer
 
-        # functions to join and split annotated and unannotated corpus
+        # functions to join and split labeled and unlabeled corpus
         self._join = lambda l, u: tf.concat([l, u], 0)
         self._labeled = lambda i: tf.slice(i, [0, 0], [self._batch_size, -1]) if i is not None else i
         self._unlabeled = lambda i: tf.slice(i, [self._batch_size, 0], [-1, -1]) if i is not None else i
@@ -183,10 +183,10 @@ class LadderNetworksExperiment(object):
         d_cost = []
 
         for l in range(self._L, -1, -1):
-            z, z_c = self._clean_encoder['unannotated']['z'][l], self._corrupted_encoder['unannotated']['z'][l]
+            z, z_c = self._clean_encoder['unlabeled']['z'][l], self._corrupted_encoder['unlabeled']['z'][l]
 
-            m = self._clean_encoder['unannotated']['m'].get(l, 0)
-            v = self._clean_encoder['unannotated']['v'].get(l, 1-1e-10)
+            m = self._clean_encoder['unlabeled']['m'].get(l, 0)
+            v = self._clean_encoder['unlabeled']['v'].get(l, 1-1e-10)
 
             if l == self._L:
                 u = self._unlabeled(self._y_c)
@@ -215,21 +215,21 @@ class LadderNetworksExperiment(object):
         layer_data = dict()
 
         # the data for labeled and unlabeled examples are stored separately
-        layer_data['annotated'] = {'z': {}, 'm': {}, 'v': {}, 'h': {}}
-        layer_data['unannotated'] = {'z': {}, 'm': {}, 'v': {}, 'h': {}}
+        layer_data['labeled'] = {'z': {}, 'm': {}, 'v': {}, 'h': {}}
+        layer_data['unlabeled'] = {'z': {}, 'm': {}, 'v': {}, 'h': {}}
 
-        # get the data for the input layer, divided in annotated and unannotated
-        layer_data['annotated']['z'][0], layer_data['unannotated']['z'][0] = self._split_lu(h)
+        # get the data for the input layer, divided in labeled and unlabeled
+        layer_data['labeled']['z'][0], layer_data['unlabeled']['z'][0] = self._split_lu(h)
         l = 1
         for l in range(1, self._L+1):
-            layer_data['annotated']['h'][l - 1], layer_data['unannotated']['h'][l - 1] = self._split_lu(h)
+            layer_data['labeled']['h'][l - 1], layer_data['unlabeled']['h'][l - 1] = self._split_lu(h)
 
             # pre-activation
             z_pre = tf.matmul(h, self._weights['W'][l-1])
-            # split annotated and unannotated examples
+            # split labeled and unlabeled examples
             z_pre_l, z_pre_u = self._split_lu(z_pre)
 
-            # batch normalization for annotated and unannotated examples is performed separately
+            # batch normalization for labeled and unlabeled examples is performed separately
             m, v = tf.nn.moments(z_pre_u, axes=[0])
             if noise_std > 0:
                 # Corrupted encoder
@@ -239,7 +239,7 @@ class LadderNetworksExperiment(object):
             else:
                 # Clean encoder
                 # batch normalization + update the average mean and variance
-                # using batch mean and variance of annotated examples
+                # using batch mean and variance of labeled examples
                 z = self._join(self._update_batch_normalization(z_pre_l, l), self._batch_normalization(z_pre_u, m, v))
 
             if l == self._L:
@@ -249,13 +249,13 @@ class LadderNetworksExperiment(object):
                 # use ReLU activation in hidden layers
                 h = tf.nn.relu(z + self._weights['beta'][l-1])
 
-            layer_data['annotated']['z'][l], layer_data['unannotated']['z'][l] = self._split_lu(z)
+            layer_data['labeled']['z'][l], layer_data['unlabeled']['z'][l] = self._split_lu(z)
 
-            # save mean and variance of unannotated examples for decoding
-            layer_data['unannotated']['m'][l], layer_data['unannotated']['v'][l] = m, v
+            # save mean and variance of unlabeled examples for decoding
+            layer_data['unlabeled']['m'][l], layer_data['unlabeled']['v'][l] = m, v
 
-        # get the h values for unannotated and annotated for the last layer
-        layer_data['annotated']['h'][l], layer_data['unannotated']['h'][l] = self._split_lu(h)
+        # get the h values for unlabeled and labeled for the last layer
+        layer_data['labeled']['h'][l], layer_data['unlabeled']['h'][l] = self._split_lu(h)
 
         return h, layer_data
 
@@ -363,7 +363,7 @@ class LadderNetworksExperiment(object):
                     for corpus_split in ('train', 'validation'):
                         self._add_result(sess, corpus_split, feed_dicts[corpus_split], self._epochs_completed)
 
-                    # selecting some random unannotated instances for classification and manual evaluation
+                    # selecting some random unlabeled instances for classification and manual evaluation
                     perm = np.array([uidx for uidx in np.random.permutation(self._unlabeled_num_examples)
                                      if uidx not in self._evaluation_sentences_indices_set])[:self._evaluation_amount]
                     y_pred = sess.run(self._y_pred, feed_dict={self._inputs: self._unlabeled_data[perm]})

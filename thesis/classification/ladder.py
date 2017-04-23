@@ -48,8 +48,8 @@ class LadderNetworksExperiment(object):
         self._num_examples = self._labeled_num_examples + self._unlabeled_num_examples
         self._num_epochs = epochs
         self._epochs_completed = 0
-        self._batch_size = self._labeled_train_data.shape[0]
-        self._num_iter = np.int(self._num_examples / self._batch_size) * self._num_epochs
+        self._batch_size = self._labeled_num_examples
+        self._num_iter = (self._num_examples / self._batch_size) * self._num_epochs
 
         # keep track of epochs
         self._labeled_permutation = np.arange(self._labeled_num_examples)
@@ -61,7 +61,7 @@ class LadderNetworksExperiment(object):
         self._denoising_cost = denoising_cost  # hyperparameters that denote the importance of each layer
 
         # functions to join and split labeled and unlabeled corpus
-        self._join = lambda l, u: tf.concat([l, u], 0)
+        self._join = lambda l, u: tf.concat(0, [l, u])
         self._labeled = lambda i: tf.slice(i, [0, 0], [self._batch_size, -1]) if i is not None else i
         self._unlabeled = lambda i: tf.slice(i, [self._batch_size, 0], [-1, -1]) if i is not None else i
         self._split_lu = lambda i: (self._labeled(i), self._unlabeled(i))

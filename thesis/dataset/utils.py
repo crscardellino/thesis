@@ -15,15 +15,13 @@ class NotEnoughSensesError(ValueError):
 def filter_minimum(target, min_count=2, invalid_target=-1):
     valid_targets = np.where(target != invalid_target)[0]
 
-    target = target[valid_targets]
-
-    labels, counts = np.unique(target, return_counts=True)
+    labels, counts = np.unique(target[valid_targets], return_counts=True)
     over_minimum_count = np.where(counts >= min_count)[0]
 
     if over_minimum_count.shape[0] < 2:
         raise NotEnoughSensesError('Not enough labels to cover minimum count')
 
-    return np.in1d(target, labels[over_minimum_count])
+    return np.arange(target.shape[0])[np.in1d(target, labels[over_minimum_count])]
 
 
 def validation_split(target, validation_ratio=0.1, force_split=True, random_seed=RANDOM_SEED):

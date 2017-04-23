@@ -36,9 +36,9 @@ def _feature_transformer(feature):
 class SemiSupervisedWrapper(object):
     def __init__(self, labeled_train_data, labeled_train_target, labeled_test_data, labeled_test_target,
                  unlabeled_data, labeled_features, unlabeled_features, min_count=2, validation_ratio=0.1,
-                 acceptance_threshold=0.8, candidates_selection='max', candidates_limit=0, error_sigma=0.001,
+                 acceptance_threshold=0.8, candidates_selection='max', candidates_limit=0, error_sigma=2,
                  random_seed=RANDOM_SEED):
-        filtered_values = filter_minimum(target=labeled_train_target, min_count=min_count)
+        filtered_values = filter_minimum(target=labeled_train_target[:], min_count=min_count)
         train_index, validation_index = validation_split(target=labeled_train_target[filtered_values],
                                                          validation_ratio=validation_ratio, random_seed=random_seed)
 
@@ -50,13 +50,10 @@ class SemiSupervisedWrapper(object):
         self._labeled_test_target = labeled_test_target
         self._unlabeled_data = unlabeled_data
 
-        # Features dictionaries
-        labeled_features = [lf for idx, lf in enumerate(labeled_features) if idx in set(filtered_values)]
-        labeled_features = [lf for idx, lf in enumerate(labeled_features) if idx in set(train_index)]
-        self._labeled_features = labeled_features
+        self._labeled_features = [labeled_features[idx] for idx in filtered_values[train_index]]
         self._unlabeled_features = unlabeled_features
 
-        self._labels = np.unique(self._labeled_train_target)
+        self._classes = np.unique(self._labeled_train_target)
         self._bootstrapped_indices = []
         self._bootstrapped_targets = []
         self._model = None
@@ -108,8 +105,7 @@ class SemiSupervisedWrapper(object):
             target = np.concatenate((target, self._bootstrapped_targets))
 
             # Add the features of the new data to the progression
-            unlabeled_features = [uf for idx, uf in enumerate(self._unlabeled_features)
-                                  if idx in set(self._bootstrapped_indices)]
+            unlabeled_features = [self._unlabeled_features[idx] for idx in self._bootstrapped_indices]
             features = self._labeled_features + unlabeled_features
 
             for tgt, feats in zip(target, features):
@@ -122,7 +118,7 @@ class SemiSupervisedWrapper(object):
 
         # Calculate cross entropy error (perhaps better with the algorithm by itself)
         # and update the results of the iteration giving the predictions
-        error = log_loss(target, self._model.predict_proba(data), labels=self._labels)
+        error = log_loss(target, self._model.predict_proba(data), labels=self._classes)
         results = pd.DataFrame({'true': target.astype(np.int32),
                                 'prediction': self._model.predict(data).astype(np.int32)})
         results.insert(0, 'error', error)
@@ -170,7 +166,7 @@ class SemiSupervisedWrapper(object):
                 break
 
             data_candidates = masked_unlabeled_data[candidates]
-            target_candidates = self._labels[prediction_probabilities[candidates].argmax(axis=1)]
+            target_candidates = self._classes[prediction_probabilities[candidates].argmax(axis=1)]
 
             train_data = (self._labeled_train_data, self._unlabeled_data[self._bootstrapped_indices], data_candidates)
             train_data = sps.vstack(train_data) if sps.issparse(self._labeled_train_data) else np.vstack(train_data)
@@ -182,13 +178,13 @@ class SemiSupervisedWrapper(object):
 
             validation_error = log_loss(self._labeled_validation_target,
                                         new_model.predict_proba(self._labeled_validation_data),
-                                        labels=self._labels)
+                                        labels=self._classes)
 
-            max_progression_error = max(self._error_progression)
+            min_progression_error = min(self._error_progression)
 
-            if self._error_sigma > 0 and validation_error > max_progression_error + self._error_sigma:
+            if self._error_sigma > 0 and validation_error > min_progression_error * self._error_sigma:
                 tqdm.write('Validation error: %.2f - Progression max error: %.2f'
-                           % (validation_error, max_progression_error), file=sys.stderr)
+                           % (validation_error, min_progression_error), file=sys.stderr)
                 break
 
             self._model = new_model
@@ -316,8 +312,9 @@ if __name__ == '__main__':
                     # Save the bootstrapped data
                     bi, bt = semisupervised.bootstrapped()
                     bootstrapped_targets.extend(bt)
-                    bootstrapped_instances.extend(':'.join(ui) for idx, ui in enumerate(
-                        unlabeled_dataset.instances_id(lemma, limit=args.unlabeled_data_limit)) if idx in set(bi))
+
+                    ul_instances = unlabeled_dataset.instances_id(lemma, limit=args.unlabeled_data_limit)
+                    bootstrapped_instances.extend(':'.join(ul_instances[idx]) for idx in bi)
                 else:
                     tqdm.write('The lemma %s didn\'t run iterations' % lemma, file=sys.stderr)
         except NotEnoughSensesError:

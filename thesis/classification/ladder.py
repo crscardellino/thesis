@@ -112,16 +112,14 @@ class LadderNetworksExperiment(object):
         return pd.concat(self._prediction_results, ignore_index=True)
 
     def _add_result(self, sess, corpus_split, feed_dict, epoch):
-        serror, uerror, y_true, y_pred = sess.run(
-            [self._lloss, self._uloss, self._y_true, self._y_pred], feed_dict=feed_dict
+        serror, y_true, y_pred = sess.run(
+            [self._lloss, self._y_true, self._y_pred], feed_dict=feed_dict
         )
         # Calculate cross entropy error (perhaps better with the algorithm by itself)
         # and update the results of the iteration giving the predictions
         results = pd.DataFrame({'true': y_true.astype(np.int32),
                                 'prediction': y_pred.astype(np.int32)})
         results.insert(0, 'supervised_error', serror)
-        results.insert(0, 'unsupervised_error', uerror)
-        results.insert(0, 'full_error', serror + uerror)
         results.insert(0, 'epoch', epoch)
         results.insert(0, 'corpus_split', corpus_split)
 

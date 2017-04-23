@@ -49,7 +49,7 @@ class LadderNetworksExperiment(object):
         self._num_epochs = epochs
         self._epochs_completed = 0
         self._batch_size = self._labeled_num_examples
-        self._num_iter = (self._num_examples / self._batch_size) * self._num_epochs
+        self._num_iter = np.int(self._num_examples / self._batch_size) * self._num_epochs
 
         # keep track of epochs
         self._labeled_permutation = np.arange(self._labeled_num_examples)
@@ -112,14 +112,13 @@ class LadderNetworksExperiment(object):
         return pd.concat(self._prediction_results, ignore_index=True)
 
     def _add_result(self, sess, corpus_split, feed_dict, epoch):
-        serror, y_true, y_pred = sess.run(
-            [self._lloss, self._y_true, self._y_pred], feed_dict=feed_dict
+        y_true, y_pred = sess.run(
+            [self._y_true, self._y_pred], feed_dict=feed_dict
         )
         # Calculate cross entropy error (perhaps better with the algorithm by itself)
         # and update the results of the iteration giving the predictions
         results = pd.DataFrame({'true': y_true.astype(np.int32),
                                 'prediction': y_pred.astype(np.int32)})
-        results.insert(0, 'supervised_error', serror)
         results.insert(0, 'epoch', epoch)
         results.insert(0, 'corpus_split', corpus_split)
 
@@ -337,7 +336,7 @@ class LadderNetworksExperiment(object):
                 },
                 'validation': {
                     self._inputs: self._labeled_validation_data,
-                    self._outputs: to_categorical(np.searchsorted(self._classes, self._labeled_validation_data))
+                    self._outputs: to_categorical(np.searchsorted(self._classes, self._labeled_validation_target))
                 }
             }
 
@@ -364,7 +363,8 @@ class LadderNetworksExperiment(object):
                     # selecting some random unlabeled instances for classification and manual evaluation
                     perm = np.array([uidx for uidx in np.random.permutation(self._unlabeled_num_examples)
                                      if uidx not in self._evaluation_sentences_indices_set])[:self._evaluation_amount]
-                    y_pred = sess.run(self._y_pred, feed_dict={self._inputs: self._unlabeled_data[perm]})
+                    if perm.shape[0] > 0:
+                        y_pred = sess.run(self._y_pred, feed_dict={self._inputs: self._unlabeled_data[perm]})
 
                     self._evaluation_sentences_indices.extend(perm)
                     self._evaluation_sentences_target.extend(y_pred)
@@ -421,6 +421,8 @@ if __name__ == '__main__':
     for lemma, data, target, features in \
             tqdm(labeled_datasets.train_dataset.traverse_dataset_by_lemma(return_features=True),
                  total=labeled_datasets.train_dataset.num_lemmas):
+        if lemma.startswith('b'):
+            break
         if not unlabeled_dataset.has_lemma(lemma):
             continue
         try:
@@ -431,7 +433,7 @@ if __name__ == '__main__':
                     labeled_test_data=labeled_datasets.test_dataset.data(lemma),
                     labeled_test_target=labeled_datasets.test_dataset.target(lemma),
                     unlabeled_data=unlabeled_dataset.data(lemma, limit=args.unlabeled_data_limit),
-                    layers=args.layers, denoising_cost=args.denoising_cost, epochs=args.epochs,
+                    layers=args.layers[:], denoising_cost=args.denoising_cost[:], epochs=args.epochs,
                     min_count=args.min_count, validation_ratio=args.validation_ratio, noise_std=args.noise_std,
                     learning_rate=0.01, evaluation_amount=1000, random_seed=args.random_seed)
 

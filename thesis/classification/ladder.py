@@ -10,6 +10,7 @@ import sys
 import tensorflow as tf
 
 from keras.utils.np_utils import to_categorical
+from scipy.sparse import issparse
 from sklearn.metrics import log_loss
 from thesis.dataset import SenseCorpusDatasets, UnlabeledCorpusDataset
 from thesis.dataset.utils import filter_minimum, validation_split, NotEnoughSensesError
@@ -21,6 +22,10 @@ class LadderNetworksExperiment(object):
     def __init__(self, labeled_train_data, labeled_train_target, labeled_test_data, labeled_test_target,
                  unlabeled_data, layers, denoising_cost, min_count=2, validation_ratio=0.1, epochs=25,
                  noise_std=0.3, learning_rate=0.01, evaluation_amount=100, random_seed=RANDOM_SEED):
+        labeled_train_data = labeled_train_data.toarray() if issparse(labeled_train_data) else labeled_train_data
+        labeled_test_data = labeled_test_data.toarray() if issparse(labeled_test_data) else labeled_test_data
+        unlabeled_data = unlabeled_data.toarray() if issparse(unlabeled_data) else unlabeled_data
+
         filtered_values = filter_minimum(target=labeled_train_target, min_count=min_count)
         train_index, validation_index = validation_split(target=labeled_train_target[filtered_values],
                                                          validation_ratio=validation_ratio, random_seed=random_seed)
@@ -368,15 +373,12 @@ class LadderNetworksExperiment(object):
                                      if uidx not in self._evaluation_sentences_indices_set])[:self._evaluation_amount]
                     if perm.shape[0] > 0:
                         y_pred = sess.run(self._y_pred, feed_dict={self._inputs: self._unlabeled_data[perm]})
-
-                    self._evaluation_sentences_indices.extend(perm)
-                    self._evaluation_sentences_target.extend(y_pred)
-                    self._evaluation_sentences_indices_set.update(perm)
+                        self._evaluation_sentences_indices.extend(perm)
+                        self._evaluation_sentences_target.extend(y_pred)
+                        self._evaluation_sentences_indices_set.update(perm)
 
             for corpus_split in ('train', 'test', 'validation'):
                 self._add_result(sess, corpus_split, feed_dicts[corpus_split], 'final')
-
-        del sess
 
 
 if __name__ == '__main__':
@@ -421,40 +423,38 @@ if __name__ == '__main__':
     evaluation_targets = []
 
     print('Running experiments per lemma', file=sys.stderr)
-    for lemma, data, target, features in \
-            tqdm(labeled_datasets.train_dataset.traverse_dataset_by_lemma(return_features=True),
+    for lemma, data, target in \
+            tqdm(labeled_datasets.train_dataset.traverse_dataset_by_lemma(),
                  total=labeled_datasets.train_dataset.num_lemmas):
         if not unlabeled_dataset.has_lemma(lemma):
             continue
         try:
             tf.reset_default_graph()
-            with tf.Session() as sess:
-                ladder_networks = LadderNetworksExperiment(
-                    labeled_train_data=data, labeled_train_target=target,
-                    labeled_test_data=labeled_datasets.test_dataset.data(lemma),
-                    labeled_test_target=labeled_datasets.test_dataset.target(lemma),
-                    unlabeled_data=unlabeled_dataset.data(lemma, limit=args.unlabeled_data_limit),
-                    layers=args.layers[:], denoising_cost=args.denoising_cost[:], epochs=args.epochs,
-                    min_count=args.min_count, validation_ratio=args.validation_ratio, noise_std=args.noise_std,
-                    learning_rate=0.01, evaluation_amount=1000, random_seed=args.random_seed)
+            ladder_networks = LadderNetworksExperiment(
+                labeled_train_data=data, labeled_train_target=target,
+                labeled_test_data=labeled_datasets.test_dataset.data(lemma),
+                labeled_test_target=labeled_datasets.test_dataset.target(lemma),
+                unlabeled_data=unlabeled_dataset.data(lemma, limit=args.unlabeled_data_limit),
+                layers=args.layers[:], denoising_cost=args.denoising_cost[:], epochs=args.epochs,
+                min_count=args.min_count, validation_ratio=args.validation_ratio, noise_std=args.noise_std,
+                learning_rate=0.01, evaluation_amount=1000, random_seed=args.random_seed)
 
-                ladder_networks.run()
+            ladder_networks.run()
 
-                pr = ladder_networks.get_results()
-                pr.insert(0, 'lemma', lemma)
-                prediction_results.append(pr)
-                # Save the bootstrapped data
-                esi, est = ladder_networks.evaluation_sentences
-                evaluation_targets.extend(est)
+            pr = ladder_networks.get_results()
+            pr.insert(0, 'lemma', lemma)
+            prediction_results.append(pr)
+            # Save the bootstrapped data
+            esi, est = ladder_networks.evaluation_sentences
+            evaluation_targets.extend(est)
 
-                ul_instances = unlabeled_dataset.instances_id(lemma, limit=args.unlabeled_data_limit)
-                evaluation_instances.extend(':'.join(ul_instances[idx]) for idx in esi)
+            ul_instances = unlabeled_dataset.instances_id(lemma, limit=args.unlabeled_data_limit)
+            evaluation_instances.extend(':'.join(ul_instances[idx]) for idx in esi)
+
         except NotEnoughSensesError:
             tqdm.write('The lemma %s doesn\'t have enough senses with at least %d occurrences'
                        % (lemma, args.min_count), file=sys.stderr)
             continue
-
-    print('Saving results', file=sys.stderr)
 
     pd.DataFrame({'instance': evaluation_instances, 'predicted_target': evaluation_targets}) \
         .to_csv('%s_unlabeled_dataset_predictions.csv' % args.base_results_path, index=False)

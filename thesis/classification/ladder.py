@@ -10,6 +10,7 @@ import sys
 import tensorflow as tf
 
 from keras.utils.np_utils import to_categorical
+from sklearn.metrics import log_loss
 from thesis.dataset import SenseCorpusDatasets, UnlabeledCorpusDataset
 from thesis.dataset.utils import filter_minimum, validation_split, NotEnoughSensesError
 from thesis.utils import RANDOM_SEED
@@ -112,13 +113,15 @@ class LadderNetworksExperiment(object):
         return pd.concat(self._prediction_results, ignore_index=True)
 
     def _add_result(self, sess, corpus_split, feed_dict, epoch):
-        y_true, y_pred = sess.run(
-            [self._y_true, self._y_pred], feed_dict=feed_dict
+        y_proba, y_true, y_pred = sess.run(
+            [self._y, self._y_true, self._y_pred], feed_dict=feed_dict
         )
         # Calculate cross entropy error (perhaps better with the algorithm by itself)
         # and update the results of the iteration giving the predictions
         results = pd.DataFrame({'true': y_true.astype(np.int32),
                                 'prediction': y_pred.astype(np.int32)})
+        error = log_loss(y_true, y_proba, labels=self._classes)
+        results.insert(0, 'error', error)
         results.insert(0, 'epoch', epoch)
         results.insert(0, 'corpus_split', corpus_split)
 
@@ -421,8 +424,6 @@ if __name__ == '__main__':
     for lemma, data, target, features in \
             tqdm(labeled_datasets.train_dataset.traverse_dataset_by_lemma(return_features=True),
                  total=labeled_datasets.train_dataset.num_lemmas):
-        if lemma.startswith('b'):
-            break
         if not unlabeled_dataset.has_lemma(lemma):
             continue
         try:

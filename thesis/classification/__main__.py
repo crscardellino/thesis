@@ -190,6 +190,7 @@ if __name__ == '__main__':
                 learning_curve_results.insert(0, 'lemma', lemma)
                 learning_curve_results.insert(0, 'layers',
                                               '_'.join(str(l) for l in args.layers) if args.layers else 'NA')
+                learning_curve_results.insert(0, 'classifier', args.classifier)
                 learning_curve_results.insert(0, 'vector_domain', args.vector_domain or 'NA')
                 learning_curve_results.insert(0, 'representation', args.representation or 'NA')
                 learning_curve_results.insert(0, 'corpus', args.corpus_name)
@@ -236,6 +237,7 @@ if __name__ == '__main__':
                 lemma_results.insert(0, 'num_classes', labels.shape[0])
                 lemma_results.insert(0, 'lemma', lemma)
                 lemma_results.insert(0, 'layers', '_'.join(str(l) for l in args.layers) if args.layers else 'NA')
+                lemma_results.insert(0, 'classifier', args.classifier)
                 lemma_results.insert(0, 'vector_domain', args.vector_domain or 'NA')
                 lemma_results.insert(0, 'representation', args.representation or 'NA')
                 lemma_results.insert(0, 'corpus', args.corpus_name)

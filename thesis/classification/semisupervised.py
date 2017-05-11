@@ -111,7 +111,7 @@ class SemiSupervisedWrapper(object):
             for tgt, feats in zip(target, features):
                 feats = [_feature_transformer(f) for f in sorted(feats.items())]
                 fdf = pd.DataFrame(feats, columns=['feature', 'count'])
-                fdf.insert(0, 'target', tgt)
+                fdf.insert(0, 'target', np.int(tgt))
                 fdf.insert(0, 'iteration', iteration)
 
                 self._features_progression.append(fdf)
@@ -120,7 +120,8 @@ class SemiSupervisedWrapper(object):
         # and update the results of the iteration giving the predictions
         error = log_loss(target, self._model.predict_proba(data), labels=self._classes)
         results = pd.DataFrame({'true': target.astype(np.int32),
-                                'prediction': self._model.predict(data).astype(np.int32)})
+                                'prediction': self._model.predict(data).astype(np.int32)},
+                               columns=['true', 'prediction'])
         results.insert(0, 'error', error)
         results.insert(0, 'iteration', iteration)
         results.insert(0, 'corpus_split', corpus_split)
@@ -225,7 +226,7 @@ if __name__ == '__main__':
     parser.add_argument('--validation_ratio', type=float, default=0.1)
     parser.add_argument('--acceptance_threshold', type=float, default=0.8)
     parser.add_argument('--candidates_selection', default='max')
-    parser.add_argument('--error_sigma', type=float, default=0.1)
+    parser.add_argument('--error_sigma', type=float, default=2)
     parser.add_argument('--random_seed', type=int, default=1234)
 
     args = parser.parse_args()
@@ -331,4 +332,4 @@ if __name__ == '__main__':
     pd.concat(certainty_progression, ignore_index=True)\
         .to_csv('%s_certainty_progression.csv' % args.base_results_path, index=False, float_format='%.2e')
     pd.concat(features_progression, ignore_index=True)\
-        .to_csv('%s_features_progression' % args.base_results_path, index=False, float_format='%.2e')
+        .to_csv('%s_features_progression.csv' % args.base_results_path, index=False, float_format='%d')

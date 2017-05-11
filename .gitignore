@@ -116,3 +116,6 @@ ENV/
 logs/
 *.err
 *.out
+helpers/*.sh
+helpers/to_run/
+!helpers/slurm.sh

@@ -201,7 +201,7 @@ if __name__ == '__main__':
             with tf.Session() as sess:
                 keras_backend.set_session(sess)
 
-                labels = np.unique(target, return_counts=True)
+                labels = np.unique(target)
 
                 if labels.shape[0] < 2:
                     tqdm.write('Lemma %s has no sufficient classes' % lemma, file=sys.stderr)
@@ -251,6 +251,6 @@ if __name__ == '__main__':
 
     try:
         print('Saving results to %s' % args.results_path, file=sys.stderr)
-        pd.concat(results, ignore_index=True).to_csv(args.results_path, index=False, float_format='%.2e')
+        pd.concat(results, ignore_index=True).to_csv(args.results_path, index=False, float_format='%.2f')
     except ValueError:
         print('No results to save', file=sys.stderr)

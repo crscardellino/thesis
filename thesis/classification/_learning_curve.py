@@ -7,7 +7,7 @@ import pandas as pd
 import tensorflow as tf
 
 from keras import backend as keras_backend
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, KFold
 from thesis.utils import cumulative_index_split
 
 
@@ -17,6 +17,10 @@ def learning_curve_training(estimator, data, target, estimator_config=None, fold
         train_target = target[indices]
 
         cv = StratifiedKFold(folds)
+        try:
+            _ = next(cv.split(train_data, train_target))
+        except ValueError:
+            cv = KFold(folds)
         for fold_no, (train_indices, test_indices) in enumerate(cv.split(train_data, train_target), start=1):
             tf.reset_default_graph()
             with tf.Session() as sess:
@@ -47,8 +51,6 @@ def learning_curve_training(estimator, data, target, estimator_config=None, fold
                 fold_test_results.insert(0, 'corpus_split', 'test')
 
                 learning_curve_results = pd.concat([fold_train_results, fold_test_results], ignore_index=True)
-                learning_curve_results.insert(0, 'train_size', fold_train_data.shape[0])
-                learning_curve_results.insert(0, 'test_size', fold_test_data.shape[0])
                 learning_curve_results.insert(0, 'percent_size', split_no / np.float(splits))
                 learning_curve_results.insert(0, 'split', split_no)
 

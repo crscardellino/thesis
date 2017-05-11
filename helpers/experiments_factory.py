@@ -26,6 +26,7 @@ if __name__ == "__main__":
     print("#!/usr/bin/env bash")
     print("set -e")
     print("cd ..", end="\n\n")
+    print("cd ..", end="\n\n")
 
     print("python -m thesis.classification \\")
     print("    %s/train_dataset.npz \\" % dataset)

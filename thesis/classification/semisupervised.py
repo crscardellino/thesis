@@ -220,6 +220,15 @@ class SemiSupervisedWrapper(object):
         for corpus_split in ('train', 'validation', 'test'):
             self._add_results(corpus_split, 'initial')
 
+        # Check validation error for initial model
+        validation_errors, cross_validation, validation_error, _ = self._validate(
+            model_class, model_config, self._labeled_train_data, self._labeled_train_target, 'initial'
+        )
+
+        self._error_progression.append(validation_error)
+        if self._folds > 0:
+            self._cross_validation_results.extend(cross_validation)
+
         iteration = 0
         bootstrap_mask = np.ones(self._unlabeled_data.shape[0], dtype=np.bool)
         unlabeled_dataset_index = np.arange(self._unlabeled_data.shape[0], dtype=np.int32)

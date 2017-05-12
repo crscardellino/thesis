@@ -11,7 +11,9 @@ import scipy.sparse as sps
 import sys
 import tensorflow as tf
 
-from sklearn.metrics import log_loss
+from keras import backend as keras_backend
+from sklearn.metrics import zero_one_loss
+from sklearn.model_selection import StratifiedKFold, KFold
 from sklearn.svm import SVC
 from thesis.classification import KerasMultilayerPerceptron
 from thesis.dataset import SenseCorpusDatasets, UnlabeledCorpusDataset
@@ -37,20 +39,28 @@ class SemiSupervisedWrapper(object):
     def __init__(self, labeled_train_data, labeled_train_target, labeled_test_data, labeled_test_target,
                  unlabeled_data, labeled_features, unlabeled_features, min_count=2, validation_ratio=0.1,
                  acceptance_threshold=0.8, candidates_selection='max', candidates_limit=0, error_sigma=2,
-                 random_seed=RANDOM_SEED):
+                 folds=0, random_seed=RANDOM_SEED):
         filtered_values = filter_minimum(target=labeled_train_target[:], min_count=min_count)
-        train_index, validation_index = validation_split(target=labeled_train_target[filtered_values],
-                                                         validation_ratio=validation_ratio, random_seed=random_seed)
 
-        self._labeled_train_data = labeled_train_data[filtered_values][train_index]
-        self._labeled_train_target = labeled_train_target[filtered_values][train_index]
-        self._labeled_validation_data = labeled_train_data[filtered_values][validation_index]
-        self._labeled_validation_target = labeled_train_target[filtered_values][validation_index]
+        if folds > 0:
+            self._labeled_train_data = labeled_train_data[filtered_values]
+            self._labeled_train_target = labeled_train_target[filtered_values]
+            self._labeled_validation_data = np.array()
+            self._labeled_validation_target = np.array()
+            self._labeled_features = [labeled_features[idx] for idx in filtered_values]
+        else:
+            train_index, validation_index = validation_split(target=labeled_train_target[filtered_values],
+                                                             validation_ratio=validation_ratio, random_seed=random_seed)
+            self._labeled_train_data = labeled_train_data[filtered_values][train_index]
+            self._labeled_train_target = labeled_train_target[filtered_values][train_index]
+            self._labeled_validation_data = labeled_train_data[filtered_values][validation_index]
+            self._labeled_validation_target = labeled_train_target[filtered_values][validation_index]
+            self._labeled_features = [labeled_features[idx] for idx in filtered_values[train_index]]
+
         self._labeled_test_data = labeled_test_data
         self._labeled_test_target = labeled_test_target
         self._unlabeled_data = unlabeled_data
 
-        self._labeled_features = [labeled_features[idx] for idx in filtered_values[train_index]]
         self._unlabeled_features = unlabeled_features
 
         self._classes = np.unique(self._labeled_train_target)
@@ -63,7 +73,9 @@ class SemiSupervisedWrapper(object):
         self._error_sigma = error_sigma
         self._features_progression = []
         self._certainty_progression = []
+        self._cross_validation_results = []
 
+        self._folds = folds
         self._acceptance_threshold = acceptance_threshold
         self._candidates_selection = candidates_selection
         self._candidates_limit = candidates_limit
@@ -94,6 +106,10 @@ class SemiSupervisedWrapper(object):
         return candidates
 
     def _add_results(self, corpus_split, iteration):
+        if corpus_split == 'validation' and self._folds > 0:
+            # If we evaluate using folds, validation results doesn't matter
+            return
+
         # Get the labeled data/target
         data = getattr(self, '_labeled_%s_data' % corpus_split)
         target = getattr(self, '_labeled_%s_target' % corpus_split)
@@ -118,20 +134,70 @@ class SemiSupervisedWrapper(object):
 
         # Calculate cross entropy error (perhaps better with the algorithm by itself)
         # and update the results of the iteration giving the predictions
-        error = log_loss(target, self._model.predict_proba(data), labels=self._classes)
         results = pd.DataFrame({'true': target.astype(np.int32),
                                 'prediction': self._model.predict(data).astype(np.int32)},
                                columns=['true', 'prediction'])
-        results.insert(0, 'error', error)
         results.insert(0, 'iteration', iteration)
         results.insert(0, 'corpus_split', corpus_split)
 
-        # For the validation corpus, we append the error progression
-        if corpus_split == 'validation':
-            self._error_progression.append(error)
-
         # Add the results to the corresponding corpus split results
         self._prediction_results.append(results)
+
+    def _validate(self, model_class, model_config, train_data, train_target, iteration):
+        if self._folds > 0:
+            validation_errors = []
+            cross_validation = []
+            cv = StratifiedKFold(self._folds)
+            try:
+                _ = next(cv.split(train_data, train_target))
+            except ValueError:
+                cv = KFold(self._folds)
+
+            for fold_no, (train_indices, test_indices) in enumerate(cv.split(train_data, train_target), start=1):
+                tf.reset_default_graph()
+                with tf.Session() as sess:
+                    keras_backend.set_session(sess)
+
+                    cv_train_data = train_data[train_indices]
+                    cv_test_data = train_data[test_indices]
+                    cv_train_target = train_target[train_indices]
+                    cv_test_target = train_target[test_indices]
+
+                    model = model_class(**model_config)
+                    model.fit(cv_train_data, cv_train_target)
+
+                    cv_train_results = pd.DataFrame(
+                        {'true': cv_train_target.astype(np.int32),
+                         'prediction': model.predict(cv_train_data).astype(np.int32)},
+                        columns=['true', 'prediction']
+                    )
+                    cv_train_results.insert(0, 'fold', fold_no)
+                    cv_train_results.insert(0, 'corpus_split', 'train')
+                    cv_train_results.insert(0, 'iteration', iteration)
+
+                    cv_test_results = pd.DataFrame(
+                        {'true': cv_test_target.astype(np.int32),
+                         'prediction': model.predict(cv_test_data).astype(np.int32)},
+                        columns=['true', 'prediction']
+                    )
+                    cv_test_results.insert(0, 'fold', fold_no)
+                    cv_test_results.insert(0, 'corpus_split', 'test')
+                    cv_train_results.insert(0, 'iteration', iteration)
+
+                    validation_errors.append(zero_one_loss(cv_test_results.true, cv_test_results.prediction))
+                    cross_validation.append(pd.concat([cv_train_results, cv_test_results], ignore_index=True))
+
+            return validation_errors, cross_validation, np.mean(validation_errors), None
+        else:
+            new_model = model_class(**model_config)
+            new_model.fit(train_data, train_target)
+
+            validation_error = zero_one_loss(
+                self._labeled_validation_target,
+                new_model.predict(self._labeled_validation_data)
+            )
+
+            return None, None, validation_error, new_model
 
     def bootstrapped(self):
         return self._bootstrapped_indices, self._bootstrapped_targets
@@ -141,7 +207,11 @@ class SemiSupervisedWrapper(object):
         certainty_progression = pd.concat(self._certainty_progression, ignore_index=True)
         features_progression = pd.concat(self._features_progression, ignore_index=True)
 
-        return prediction_results, certainty_progression, features_progression
+        if self._folds > 0:
+            cross_validation_results = pd.concat(self._cross_validation_results, ignore_index=True)
+            return prediction_results, certainty_progression, features_progression, cross_validation_results
+        else:
+            return prediction_results, certainty_progression, features_progression
 
     def run(self, model_class, model_config):
         self._model = model_class(**model_config)
@@ -173,24 +243,28 @@ class SemiSupervisedWrapper(object):
             train_data = sps.vstack(train_data) if sps.issparse(self._labeled_train_data) else np.vstack(train_data)
             train_target = np.concatenate((self._labeled_train_target, self._bootstrapped_targets, target_candidates))
 
-            # Train the new model
-            new_model = model_class(**model_config)
-            new_model.fit(train_data, train_target)
-
-            validation_error = log_loss(self._labeled_validation_target,
-                                        new_model.predict_proba(self._labeled_validation_data),
-                                        labels=self._classes)
+            # Train the new model and check validation
+            validation_errors, cross_validation, validation_error, new_model = self._validate(
+                model_class, model_config, train_data, train_target, iteration
+            )
 
             min_progression_error = min(self._error_progression)
 
-            if self._error_sigma > 0 and validation_error > min_progression_error * self._error_sigma:
+            if self._error_sigma > 0 and validation_error > min_progression_error + self._error_sigma:
                 tqdm.write('Validation error: %.2f - Progression max error: %.2f'
                            % (validation_error, min_progression_error), file=sys.stderr)
                 break
 
-            self._model = new_model
+            if args.folds > 0:
+                self._cross_validation_results.extend(cross_validation)
+                self._model = model_class(**model_config)
+                self._model.fit(train_data, train_target)
+            else:
+                self._model = new_model
+
             self._bootstrapped_indices.extend(unlabeled_dataset_index[bootstrap_mask][candidates])
             self._bootstrapped_targets.extend(target_candidates)
+            self._error_progression.append(validation_error)
             iteration += 1
 
             # Add the certainty of the predicted classes of the unseen examples to the certainty progression results
@@ -226,8 +300,9 @@ if __name__ == '__main__':
     parser.add_argument('--validation_ratio', type=float, default=0.1)
     parser.add_argument('--acceptance_threshold', type=float, default=0.8)
     parser.add_argument('--candidates_selection', default='max')
-    parser.add_argument('--error_sigma', type=float, default=2)
+    parser.add_argument('--error_sigma', type=float, default=0.1)
     parser.add_argument('--random_seed', type=int, default=1234)
+    parser.add_argument('--folds', type=int, default=0)
 
     args = parser.parse_args()
 
@@ -279,6 +354,7 @@ if __name__ == '__main__':
     prediction_results = []
     certainty_progression = []
     features_progression = []
+    cross_validation_results = []
     bootstrapped_instances = []
     bootstrapped_targets = []
 
@@ -291,6 +367,8 @@ if __name__ == '__main__':
         try:
             tf.reset_default_graph()
             with tf.Session() as sess:
+                keras_backend.set_session(sess)
+
                 semisupervised = SemiSupervisedWrapper(
                     labeled_train_data=data, labeled_train_target=target,
                     labeled_test_data=labeled_datasets.test_dataset.data(lemma),
@@ -299,10 +377,16 @@ if __name__ == '__main__':
                     labeled_features=features, min_count=args.min_count, validation_ratio=args.validation_ratio,
                     acceptance_threshold=args.acceptance_threshold, candidates_selection=args.candidates_selection,
                     unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
-                    candidates_limit=args.candidates_limit, error_sigma=args.error_sigma, random_seed=args.random_seed)
+                    candidates_limit=args.candidates_limit, error_sigma=args.error_sigma, folds=args.folds,
+                    random_seed=args.random_seed)
 
                 if semisupervised.run(_CLASSIFIERS[args.classifier], config) > 0:
-                    pr, cp, fp = semisupervised.get_results()
+                    if args.folds > 0:
+                        pr, cp, fp, cv = semisupervised.get_results()
+                        cv.insert(0, 'lema', lemma)
+                        cross_validation_results.append(cv)
+                    else:
+                        pr, cp, fp = semisupervised.get_results()
                     pr.insert(0, 'lemma', lemma)
                     cp.insert(0, 'lemma', lemma)
                     fp.insert(0, 'lemma', lemma)
@@ -328,8 +412,13 @@ if __name__ == '__main__':
     pd.DataFrame({'instance': bootstrapped_instances, 'predicted_target': bootstrapped_targets}) \
         .to_csv('%s_unlabeled_dataset_predictions.csv' % args.base_results_path, index=False)
     pd.concat(prediction_results, ignore_index=True)\
-        .to_csv('%s_prediction_results.csv' % args.base_results_path, index=False, float_format='%.2e')
+        .to_csv('%s_prediction_results.csv' % args.base_results_path, index=False, float_format='%d')
     pd.concat(certainty_progression, ignore_index=True)\
         .to_csv('%s_certainty_progression.csv' % args.base_results_path, index=False, float_format='%.2e')
     pd.concat(features_progression, ignore_index=True)\
         .to_csv('%s_features_progression.csv' % args.base_results_path, index=False, float_format='%d')
+
+    if cross_validation_results:
+        pd.concat(cross_validation_results, ignore_index=True) \
+            .to_csv('%s_cross_validation_results.csv' % args.base_results_path, index=False, float_format='%d')
+

@@ -45,8 +45,8 @@ class SemiSupervisedWrapper(object):
         if folds > 0:
             self._labeled_train_data = labeled_train_data[filtered_values]
             self._labeled_train_target = labeled_train_target[filtered_values]
-            self._labeled_validation_data = np.array()
-            self._labeled_validation_target = np.array()
+            self._labeled_validation_data = np.array([])
+            self._labeled_validation_target = np.array([])
             self._labeled_features = [labeled_features[idx] for idx in filtered_values]
         else:
             train_index, validation_index = validation_split(target=labeled_train_target[filtered_values],
@@ -260,7 +260,7 @@ class SemiSupervisedWrapper(object):
             min_progression_error = min(self._error_progression)
 
             if self._error_sigma > 0 and validation_error > min_progression_error + self._error_sigma:
-                tqdm.write('Validation error: %.2f - Progression max error: %.2f'
+                tqdm.write('Validation error: %.2f - Progression min error: %.2f'
                            % (validation_error, min_progression_error), file=sys.stderr)
                 break
 

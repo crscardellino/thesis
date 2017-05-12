@@ -154,38 +154,36 @@ class SemiSupervisedWrapper(object):
                 cv = KFold(self._folds)
 
             for fold_no, (train_indices, test_indices) in enumerate(cv.split(train_data, train_target), start=1):
-                tf.reset_default_graph()
-                with tf.Session() as sess:
-                    keras_backend.set_session(sess)
+                keras_backend.set_session(sess)
 
-                    cv_train_data = train_data[train_indices]
-                    cv_test_data = train_data[test_indices]
-                    cv_train_target = train_target[train_indices]
-                    cv_test_target = train_target[test_indices]
+                cv_train_data = train_data[train_indices]
+                cv_test_data = train_data[test_indices]
+                cv_train_target = train_target[train_indices]
+                cv_test_target = train_target[test_indices]
 
-                    model = model_class(**model_config)
-                    model.fit(cv_train_data, cv_train_target)
+                model = model_class(**model_config)
+                model.fit(cv_train_data, cv_train_target)
 
-                    cv_train_results = pd.DataFrame(
-                        {'true': cv_train_target.astype(np.int32),
-                         'prediction': model.predict(cv_train_data).astype(np.int32)},
-                        columns=['true', 'prediction']
-                    )
-                    cv_train_results.insert(0, 'fold', fold_no)
-                    cv_train_results.insert(0, 'corpus_split', 'train')
-                    cv_train_results.insert(0, 'iteration', iteration)
+                cv_train_results = pd.DataFrame(
+                    {'true': cv_train_target.astype(np.int32),
+                     'prediction': model.predict(cv_train_data).astype(np.int32)},
+                    columns=['true', 'prediction']
+                )
+                cv_train_results.insert(0, 'fold', fold_no)
+                cv_train_results.insert(0, 'corpus_split', 'train')
+                cv_train_results.insert(0, 'iteration', iteration)
 
-                    cv_test_results = pd.DataFrame(
-                        {'true': cv_test_target.astype(np.int32),
-                         'prediction': model.predict(cv_test_data).astype(np.int32)},
-                        columns=['true', 'prediction']
-                    )
-                    cv_test_results.insert(0, 'fold', fold_no)
-                    cv_test_results.insert(0, 'corpus_split', 'test')
-                    cv_train_results.insert(0, 'iteration', iteration)
+                cv_test_results = pd.DataFrame(
+                    {'true': cv_test_target.astype(np.int32),
+                     'prediction': model.predict(cv_test_data).astype(np.int32)},
+                    columns=['true', 'prediction']
+                )
+                cv_test_results.insert(0, 'fold', fold_no)
+                cv_test_results.insert(0, 'corpus_split', 'test')
+                cv_test_results.insert(0, 'iteration', iteration)
 
-                    validation_errors.append(zero_one_loss(cv_test_results.true, cv_test_results.prediction))
-                    cross_validation.append(pd.concat([cv_train_results, cv_test_results], ignore_index=True))
+                validation_errors.append(zero_one_loss(cv_test_results.true, cv_test_results.prediction))
+                cross_validation.append(pd.concat([cv_train_results, cv_test_results], ignore_index=True))
 
             return validation_errors, cross_validation, np.mean(validation_errors), None
         else:

@@ -356,7 +356,8 @@ if __name__ == '__main__':
 
     print('Loading unlabeled dataset', file=sys.stderr)
     unlabeled_dataset = UnlabeledCorpusDataset(dataset_path=unlabeled_dataset_path,
-                                               features_dict_path=unlabeled_features_path,
+                                               features_dict_path=unlabeled_features_path
+                                               if args.word_vector_model_path is None else None,
                                                word_vector_model=labeled_datasets.train_dataset.word_vector_model,
                                                dataset_extra=unlabeled_dataset_extra_path)
 

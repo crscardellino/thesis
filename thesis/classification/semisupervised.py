@@ -343,9 +343,11 @@ if __name__ == '__main__':
 
     print('Loading labeled dataset', file=sys.stderr)
     labeled_datasets = SenseCorpusDatasets(train_dataset_path=labeled_datasets_path % 'train',
-                                           train_features_dict_path=labeled_features_path % 'train',
+                                           train_features_dict_path=labeled_features_path % 'train'
+                                           if args.word_vector_model_path is not None else None,
                                            test_dataset_path=labeled_datasets_path % 'test',
-                                           test_features_dict_path=labeled_features_path % 'test',
+                                           test_features_dict_path=labeled_features_path % 'test'
+                                           if args.word_vector_model_path is not None else None,
                                            word_vector_model_path=args.word_vector_model_path,
                                            train_dataset_extra=labeled_datasets_extra_path % 'train'
                                            if labeled_datasets_extra_path is not None else None,

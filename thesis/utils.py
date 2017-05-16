@@ -6,6 +6,28 @@ import fnmatch
 import numpy as np
 import os
 
+from sklearn.feature_selection import chi2, f_classif, mutual_info_classif
+from sklearn.linear_model import LogisticRegression
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from thesis.classification import BaselineClassifier, KerasMultilayerPerceptron
+
+CLASSIFIERS = {
+    'baseline': BaselineClassifier,
+    'decision_tree': DecisionTreeClassifier,
+    'log': LogisticRegression,
+    'mlp': KerasMultilayerPerceptron,
+    'naive_bayes': MultinomialNB,
+    'svm': SVC
+}
+
+FEATURE_SELECTION = {
+    'chi2': chi2,
+    'f_classif': f_classif,
+    'mutual_info_classif': mutual_info_classif
+}
+
 
 SENSEM_COLUMNS = ('idx', 'token', 'lemma', 'tag', 'morpho_info', 'ner', 'dep_head', 'dep_rel')
 SEMEVAL_COLUMNS = ('idx', 'token', 'lemma', 'tag', 'ner', 'dep_head', 'dep_rel')

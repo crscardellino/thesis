@@ -13,35 +13,15 @@ import warnings
 
 from keras import backend as keras_backend
 from scipy.sparse import issparse
-from sklearn.feature_selection import SelectKBest, chi2, f_classif, mutual_info_classif
-from sklearn.linear_model import LogisticRegression
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.svm import SVC
-from sklearn.tree import DecisionTreeClassifier
-from thesis.classification import BaselineClassifier, KerasMultilayerPerceptron, learning_curve_training
+from sklearn.feature_selection import SelectKBest
+from thesis.classification import learning_curve_training
 from thesis.dataset import SenseCorpusDatasets
-from thesis.utils import try_number
+from thesis.utils import try_number, CLASSIFIERS, FEATURE_SELECTION
 from tqdm import tqdm
 
 # Set logging
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
-
-
-_CLASSIFIERS = {
-    'baseline': BaselineClassifier,
-    'decision_tree': DecisionTreeClassifier,
-    'log': LogisticRegression,
-    'mlp': KerasMultilayerPerceptron,
-    'naive_bayes': MultinomialNB,
-    'svm': SVC
-}
-
-_FEATURE_SELECTION = {
-    'chi2': chi2,
-    'f_classif': f_classif,
-    'mutual_info_classif': mutual_info_classif
-}
 
 
 if __name__ == '__main__':
@@ -155,7 +135,7 @@ if __name__ == '__main__':
     print('Training models and getting results', file=sys.stderr)
     for lemma, data, target in tqdm(datasets.train_dataset.traverse_dataset_by_lemma(),
                                     total=datasets.train_dataset.num_lemmas):
-        selector = SelectKBest(_FEATURE_SELECTION[args.feature_selection], k=args.max_features)
+        selector = SelectKBest(FEATURE_SELECTION[args.feature_selection], k=args.max_features)
 
         if args.folds > 0:
             # We use everything but removing classes we have no idea about (-1)
@@ -183,7 +163,7 @@ if __name__ == '__main__':
                 selector.fit(data, target)
                 data = selector.transform(data)
 
-            for learning_curve_results in learning_curve_training(_CLASSIFIERS[args.classifier], data, target,
+            for learning_curve_results in learning_curve_training(CLASSIFIERS[args.classifier], data, target,
                                                                   args.classifier_config, args.folds, args.splits,
                                                                   args.min_count):
                 learning_curve_results.insert(0, 'num_classes', minimum_counts.shape[0])
@@ -212,7 +192,7 @@ if __name__ == '__main__':
                     selector.fit(data, target)
                     data = selector.transform(data)
 
-                model = _CLASSIFIERS[args.classifier](**config)
+                model = CLASSIFIERS[args.classifier](**config)
                 model.fit(data, target)
 
                 train_results = pd.DataFrame(

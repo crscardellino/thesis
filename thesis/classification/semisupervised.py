@@ -2,30 +2,16 @@
 
 from __future__ import absolute_import, unicode_literals
 
-import argparse
-import json
 import numpy as np
-import os
 import pandas as pd
 import scipy.sparse as sps
 import sys
-import tensorflow as tf
 
-from keras import backend as keras_backend
 from sklearn.metrics import zero_one_loss
 from sklearn.model_selection import StratifiedKFold, KFold
-from sklearn.svm import SVC
-from thesis.classification import KerasMultilayerPerceptron
-from thesis.dataset import SenseCorpusDatasets, UnlabeledCorpusDataset
-from thesis.dataset.utils import filter_minimum, validation_split, NotEnoughSensesError
-from thesis.utils import try_number, RANDOM_SEED
+from thesis.dataset.utils import filter_minimum, validation_split
+from thesis.utils import RANDOM_SEED
 from tqdm import tqdm
-
-
-_CLASSIFIERS = {
-    'mlp': KerasMultilayerPerceptron,
-    'svm': SVC
-}
 
 
 def _feature_transformer(feature):
@@ -60,7 +46,6 @@ class SemiSupervisedWrapper(object):
         self._labeled_test_data = labeled_test_data
         self._labeled_test_target = labeled_test_target
         self._unlabeled_data = unlabeled_data
-
         self._unlabeled_features = unlabeled_features
 
         self._classes = np.unique(self._labeled_train_target)
@@ -104,6 +89,9 @@ class SemiSupervisedWrapper(object):
             candidates = candidates[over_threshold]
 
         return candidates
+
+    def _get_target_candidates(self, prediction_probabilities=None, candidates=None):
+        raise NotImplementedError
 
     def _add_results(self, corpus_split, iteration):
         if corpus_split == 'validation' and self._folds > 0:
@@ -154,8 +142,6 @@ class SemiSupervisedWrapper(object):
                 cv = KFold(self._folds)
 
             for fold_no, (train_indices, test_indices) in enumerate(cv.split(train_data, train_target), start=1):
-                keras_backend.set_session(sess)
-
                 cv_train_data = train_data[train_indices]
                 cv_test_data = train_data[test_indices]
                 cv_train_target = train_target[train_indices]
@@ -244,7 +230,7 @@ class SemiSupervisedWrapper(object):
                 break
 
             data_candidates = masked_unlabeled_data[candidates]
-            target_candidates = self._classes[prediction_probabilities[candidates].argmax(axis=1)]
+            target_candidates = self._get_target_candidates(prediction_probabilities, candidates)
 
             train_data = (self._labeled_train_data, self._unlabeled_data[self._bootstrapped_indices], data_candidates)
             train_data = sps.vstack(train_data) if sps.issparse(self._labeled_train_data) else np.vstack(train_data)
@@ -262,7 +248,7 @@ class SemiSupervisedWrapper(object):
                            % (validation_error, min_progression_error), file=sys.stderr)
                 break
 
-            if args.folds > 0:
+            if self._folds > 0:
                 self._cross_validation_results.extend(cross_validation)
                 self._model = model_class(**model_config)
                 self._model.fit(train_data, train_target)
@@ -288,147 +274,17 @@ class SemiSupervisedWrapper(object):
         return iteration
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('labeled_dataset_path')
-    parser.add_argument('unlabeled_dataset_path')
-    parser.add_argument('base_results_path')
-    parser.add_argument('--word_vector_model_path', default=None)
-    parser.add_argument('--labeled_dataset_extra', default=None)
-    parser.add_argument('--unlabeled_dataset_extra', default=None)
-    parser.add_argument('--classifier', type=str, default='svm')
-    parser.add_argument('--classifier_config_file', type=str, default=None)
-    parser.add_argument('--classifier_config', type=lambda config: tuple(config.split('=')),
-                        default=list(), nargs='+')
-    parser.add_argument('--layers', type=int, nargs='+', default=list())
-    parser.add_argument('--unlabeled_data_limit', type=int, default=1000)
-    parser.add_argument('--candidates_limit', type=int, default=0)
-    parser.add_argument('--min_count', type=int, default=2)
-    parser.add_argument('--validation_ratio', type=float, default=0.1)
-    parser.add_argument('--acceptance_threshold', type=float, default=0.8)
-    parser.add_argument('--candidates_selection', default='max')
-    parser.add_argument('--error_sigma', type=float, default=0.1)
-    parser.add_argument('--random_seed', type=int, default=1234)
-    parser.add_argument('--folds', type=int, default=0)
+class SelfLearningWrapper(SemiSupervisedWrapper):
+    def _get_target_candidates(self, prediction_probabilities=None, candidates=None):
+        return self._classes[prediction_probabilities[candidates].argmax(axis=1)]
 
-    args = parser.parse_args()
 
-    if args.classifier_config_file is not None:
-        with open(args.classifier_config_file, 'r') as fconfig:
-            config = json.load(fconfig)
-    else:
-        config = {}
+class ActiveLearningWrapper(SemiSupervisedWrapper):
+    def __init__(self, **kwargs):
+        self._unlabeled_target = kwargs.pop('unlabeled_target', None)
+        super(ActiveLearningWrapper, self).__init__(**kwargs)
 
-    args.classifier_config = [args.classifier_config] \
-        if isinstance(args.classifier_config, tuple) else args.classifier_config
-
-    for key, value in args.classifier_config:
-        config[key] = try_number(value)
-
-    if args.classifier == 'svm':
-        config['kernel'] = 'linear'
-        config['probability'] = True
-
-    if args.layers:
-        config['layers'] = [args.layers] if isinstance(args.layers, int) else args.layers
-
-    labeled_datasets_path = os.path.join(args.labeled_dataset_path, '%s_dataset.npz')
-    labeled_features_path = os.path.join(args.labeled_dataset_path, '%s_features.p')
-    labeled_datasets_extra_path = os.path.join(args.labeled_dataset_extra, '%s_dataset.npz')\
-        if args.labeled_dataset_extra is not None else None
-    unlabeled_dataset_path = os.path.join(args.unlabeled_dataset_path, 'dataset.npz')
-    unlabeled_features_path = os.path.join(args.unlabeled_dataset_path, 'features.p')
-    unlabeled_dataset_extra_path = os.path.join(args.unlabeled_dataset_extra, 'dataset.npz')\
-        if args.unlabeled_dataset_extra is not None else None
-
-    print('Loading labeled dataset', file=sys.stderr)
-    labeled_datasets = SenseCorpusDatasets(train_dataset_path=labeled_datasets_path % 'train',
-                                           train_features_dict_path=labeled_features_path % 'train'
-                                           if args.word_vector_model_path is None else None,
-                                           test_dataset_path=labeled_datasets_path % 'test',
-                                           test_features_dict_path=labeled_features_path % 'test'
-                                           if args.word_vector_model_path is None else None,
-                                           word_vector_model_path=args.word_vector_model_path,
-                                           train_dataset_extra=labeled_datasets_extra_path % 'train'
-                                           if labeled_datasets_extra_path is not None else None,
-                                           test_dataset_extra=labeled_datasets_extra_path % 'test'
-                                           if labeled_datasets_extra_path is not None else None)
-
-    print('Loading unlabeled dataset', file=sys.stderr)
-    unlabeled_dataset = UnlabeledCorpusDataset(dataset_path=unlabeled_dataset_path,
-                                               features_dict_path=unlabeled_features_path
-                                               if args.word_vector_model_path is None else None,
-                                               word_vector_model=labeled_datasets.train_dataset.word_vector_model,
-                                               dataset_extra=unlabeled_dataset_extra_path)
-
-    prediction_results = []
-    certainty_progression = []
-    features_progression = []
-    cross_validation_results = []
-    bootstrapped_instances = []
-    bootstrapped_targets = []
-
-    print('Running experiments per lemma', file=sys.stderr)
-    for lemma, data, target, features in \
-            tqdm(labeled_datasets.train_dataset.traverse_dataset_by_lemma(return_features=True),
-                 total=labeled_datasets.train_dataset.num_lemmas):
-        if not unlabeled_dataset.has_lemma(lemma):
-            continue
-        try:
-            tf.reset_default_graph()
-            with tf.Session() as sess:
-                keras_backend.set_session(sess)
-
-                semisupervised = SemiSupervisedWrapper(
-                    labeled_train_data=data, labeled_train_target=target,
-                    labeled_test_data=labeled_datasets.test_dataset.data(lemma),
-                    labeled_test_target=labeled_datasets.test_dataset.target(lemma),
-                    unlabeled_data=unlabeled_dataset.data(lemma, limit=args.unlabeled_data_limit),
-                    labeled_features=features, min_count=args.min_count, validation_ratio=args.validation_ratio,
-                    acceptance_threshold=args.acceptance_threshold, candidates_selection=args.candidates_selection,
-                    unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
-                    candidates_limit=args.candidates_limit, error_sigma=args.error_sigma, folds=args.folds,
-                    random_seed=args.random_seed)
-
-                if semisupervised.run(_CLASSIFIERS[args.classifier], config) > 0:
-                    if args.folds > 0:
-                        pr, cp, fp, cv = semisupervised.get_results()
-                        cv.insert(0, 'lema', lemma)
-                        cross_validation_results.append(cv)
-                    else:
-                        pr, cp, fp = semisupervised.get_results()
-                    pr.insert(0, 'lemma', lemma)
-                    cp.insert(0, 'lemma', lemma)
-                    fp.insert(0, 'lemma', lemma)
-                    prediction_results.append(pr)
-                    certainty_progression.append(cp)
-                    features_progression.append(fp)
-
-                    # Save the bootstrapped data
-                    bi, bt = semisupervised.bootstrapped()
-                    bootstrapped_targets.extend(bt)
-
-                    ul_instances = unlabeled_dataset.instances_id(lemma, limit=args.unlabeled_data_limit)
-                    bootstrapped_instances.extend(':'.join(ul_instances[idx]) for idx in bi)
-                else:
-                    tqdm.write('The lemma %s didn\'t run iterations' % lemma, file=sys.stderr)
-        except NotEnoughSensesError:
-            tqdm.write('The lemma %s doesn\'t have enough senses with at least %d occurrences'
-                       % (lemma, args.min_count), file=sys.stderr)
-            continue
-
-    print('Saving results', file=sys.stderr)
-
-    pd.DataFrame({'instance': bootstrapped_instances, 'predicted_target': bootstrapped_targets}) \
-        .to_csv('%s_unlabeled_dataset_predictions.csv' % args.base_results_path, index=False)
-    pd.concat(prediction_results, ignore_index=True)\
-        .to_csv('%s_prediction_results.csv' % args.base_results_path, index=False, float_format='%d')
-    pd.concat(certainty_progression, ignore_index=True)\
-        .to_csv('%s_certainty_progression.csv' % args.base_results_path, index=False, float_format='%.2e')
-    pd.concat(features_progression, ignore_index=True)\
-        .to_csv('%s_features_progression.csv' % args.base_results_path, index=False, float_format='%d')
-
-    if cross_validation_results:
-        pd.concat(cross_validation_results, ignore_index=True) \
-            .to_csv('%s_cross_validation_results.csv' % args.base_results_path, index=False, float_format='%d')
-
+    def _get_target_candidates(self, prediction_probabilities=None, candidates=None):
+        bootstrap_mask = np.ones(self._unlabeled_data.shape[0], dtype=np.bool)
+        bootstrap_mask[self._bootstrapped_indices] = False
+        masked_unlabeled_target = self._unlabeled_target[bootstrap_mask]

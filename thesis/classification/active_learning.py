@@ -126,10 +126,12 @@ if __name__ == '__main__':
                     unlabeled_data = unlabeled_dataset.data(lemma, limit=args.unlabeled_data_limit)
                     unlabeled_target = None
                 else:
-                    unlabeled_data = data[unlabeled_indices]
-                    unlabeled_target = target[unlabeled_indices]
-                    data = data[initial_indices]
-                    target = target[initial_indices]
+                    li = np.in1d(labeled_datasets.train_dataset.lemmas_index(lemma), initial_indices)
+                    ui = np.in1d(labeled_datasets.train_dataset.lemmas_index(lemma), unlabeled_indices)
+                    unlabeled_data = data[ui]
+                    unlabeled_target = target[ui]
+                    data = data[li]
+                    target = target[li]
 
                 semisupervised = ActiveLearningWrapper(
                     labeled_train_data=data, labeled_train_target=target,

@@ -177,6 +177,9 @@ class SenseCorpusDataset(CorpusDataset):
         else:
             return np.array([cls for cls in self._train_classes if lemma == cls.split('.')[1]]).shape[0]
 
+    def lemmas_index(self, lemma):
+        return np.where(self._lemmas == lemma)[0]
+
     def num_examples(self, lemma=None):
         return self.data(lemma).shape[0]
 

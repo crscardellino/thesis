@@ -4,6 +4,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 import argparse
 import os
+import sys
 
 from functools import partial
 from multiprocessing import Pool
@@ -12,6 +13,7 @@ from thesis.utils import find
 
 
 def process_file(ifile, meta):
+    print('Processing %s' % ifile, file=sys.stderr)
     basename = os.path.basename(ifile)
     ofile = os.path.join(args.output, basename)
     with open(ifile, 'r') as fin, open(ofile, 'w') as fout:

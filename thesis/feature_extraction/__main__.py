@@ -15,7 +15,7 @@ from sklearn.feature_extraction import DictVectorizer
 from thesis.feature_extraction import (HandcraftedFeaturesExtractor, HandcraftedHashedFeaturesExtractor,
                                        WordWindowExtractor)
 from thesis.parsers import ColumnCorpusParser
-from thesis.utils import SEMEVAL_COLUMNS, SENSEM_COLUMNS
+from thesis.constants import SENSEM_COLUMNS, SEMEVAL_COLUMNS
 from tqdm import tqdm
 
 

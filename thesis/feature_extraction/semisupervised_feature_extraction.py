@@ -13,26 +13,8 @@ import sys
 from scipy.sparse import vstack
 from thesis.feature_extraction import (HandcraftedHashedFeaturesExtractor, WordWindowExtractor)
 from thesis.parsers import ColumnCorpusParser
-from thesis.utils import SEMEVAL_COLUMNS, SENSEM_COLUMNS
+from thesis.constants import DEFAULT_FEATURES, LANGUAGE, CORPUS_COLUMNS
 from tqdm import tqdm
-
-
-_DEFAULT_FEATURES = {
-    'main_token': True, 'main_lemma': True, 'main_tag': True, 'main_morpho': True,
-    'window_bow': True, 'window_tokens': True, 'window_lemmas': True, 'window_tags': True,
-    'surrounding_bigrams': True, 'surrounding_trigrams': True,
-    'inbound_dep_triples': True, 'outbound_dep_triples': True
-}
-
-_CORPUS_COLUMNS = {
-    'semeval': SEMEVAL_COLUMNS,
-    'sensem': SENSEM_COLUMNS
-}
-
-_LANGUAGE = {
-    'spanish': 'sensem',
-    'english': 'semeval'
-}
 
 
 if __name__ == '__main__':
@@ -78,7 +60,7 @@ if __name__ == '__main__':
     args.ignored_features = [args.ignored_features] \
         if isinstance(args.ignored_features, str) else args.ignored_features
 
-    features = _DEFAULT_FEATURES.copy()
+    features = DEFAULT_FEATURES.copy()
 
     for ignored_feature in args.ignored_features:
         features.pop(ignored_feature, None)
@@ -108,7 +90,7 @@ if __name__ == '__main__':
     with open(args.corpus_labels, 'rb') as f:
         valid_lemmas = pickle.load(f)
         valid_lemmas = {lemma for lemma, (_, count) in
-                        valid_lemmas[_LANGUAGE[args.corpus_language]]['lemmas'].items()
+                        valid_lemmas[LANGUAGE[args.corpus_language]]['lemmas'].items()
                         if count[count >= 3].shape[0] > 1}
 
     print('Getting instances', file=sys.stderr)
@@ -119,7 +101,7 @@ if __name__ == '__main__':
 
     for corpus_file in tqdm(corpora_files):
         corpus_file = corpus_file.strip()
-        parser = ColumnCorpusParser(corpus_file, *_CORPUS_COLUMNS[_LANGUAGE[args.corpus_language]])
+        parser = ColumnCorpusParser(corpus_file, *CORPUS_COLUMNS[LANGUAGE[args.corpus_language]])
         lemmas_for_corpus = {lemma: 0 for lemma in valid_lemmas}
 
         for sentence in tqdm(parser.sentences):

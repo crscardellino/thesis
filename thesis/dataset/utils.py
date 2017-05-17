@@ -5,7 +5,7 @@ from __future__ import absolute_import, unicode_literals
 import numpy as np
 
 from sklearn.model_selection import StratifiedShuffleSplit
-from thesis.utils import RANDOM_SEED
+from thesis.constants import RANDOM_SEED
 
 
 class NotEnoughSensesError(ValueError):

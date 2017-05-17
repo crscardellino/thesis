@@ -14,7 +14,7 @@ from scipy.sparse import issparse
 from sklearn.metrics import log_loss
 from thesis.dataset import SenseCorpusDatasets, UnlabeledCorpusDataset
 from thesis.dataset.utils import filter_minimum, validation_split, NotEnoughSensesError
-from thesis.utils import RANDOM_SEED
+from thesis.constants import RANDOM_SEED
 from tqdm import tqdm, trange
 
 

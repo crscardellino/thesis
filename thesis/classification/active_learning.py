@@ -14,7 +14,8 @@ from keras import backend as keras_backend
 from thesis.classification.semisupervised import ActiveLearningWrapper
 from thesis.dataset import SenseCorpusDatasets, UnlabeledCorpusDataset
 from thesis.dataset.utils import NotEnoughSensesError
-from thesis.utils import try_number, CLASSIFIERS
+from thesis.utils import try_number
+from thesis.constants import CLASSIFIERS
 from tqdm import tqdm
 
 

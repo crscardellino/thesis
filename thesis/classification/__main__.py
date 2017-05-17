@@ -16,7 +16,8 @@ from scipy.sparse import issparse
 from sklearn.feature_selection import SelectKBest
 from thesis.classification import learning_curve_training
 from thesis.dataset import SenseCorpusDatasets
-from thesis.utils import try_number, CLASSIFIERS, FEATURE_SELECTION
+from thesis.utils import try_number
+from thesis.constants import CLASSIFIERS, FEATURE_SELECTION
 from tqdm import tqdm
 
 # Set logging

@@ -10,7 +10,7 @@ import sys
 from sklearn.metrics import zero_one_loss
 from sklearn.model_selection import StratifiedKFold, KFold
 from thesis.dataset.utils import filter_minimum, validation_split
-from thesis.utils import RANDOM_SEED
+from thesis.constants import RANDOM_SEED
 from tqdm import tqdm
 
 

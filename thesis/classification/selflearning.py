@@ -129,6 +129,8 @@ if __name__ == '__main__':
                             rst.insert(0, 'folds', args.folds if args.folds > 0 else 'NA')
                             rst.insert(0, 'num_classes', semisupervised.classes.shape[0])
                             rst.insert(0, 'lemma', lemma)
+                            rst.insert(0, 'candidates_limit', args.candidates_limit)
+                            rst.insert(0, 'candidates_selection', args.candidates_selection)
                             rst.insert(0, 'layers', '_'.join(str(l) for l in args.layers) if args.layers else 'NA')
                             rst.insert(0, 'classifier', args.classifier)
                             rst.insert(0, 'vector_domain', args.vector_domain or 'NA')

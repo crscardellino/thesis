@@ -39,6 +39,9 @@ if __name__ == '__main__':
     parser.add_argument('--error_sigma', type=float, default=0.1)
     parser.add_argument('--random_seed', type=int, default=1234)
     parser.add_argument('--folds', type=int, default=0)
+    parser.add_argument('--corpus_name', default='')
+    parser.add_argument('--representation', default='')
+    parser.add_argument('--vector_domain', default='')
 
     args = parser.parse_args()
 
@@ -59,7 +62,8 @@ if __name__ == '__main__':
         config['probability'] = True
 
     if args.layers:
-        config['layers'] = [args.layers] if isinstance(args.layers, int) else args.layers
+        args.layers = [args.layers] if isinstance(args.layers, int) else args.layers
+        config['layers'] = args.layers
 
     labeled_datasets_path = os.path.join(args.labeled_dataset_path, '%s_dataset.npz')
     labeled_features_path = os.path.join(args.labeled_dataset_path, '%s_features.p')
@@ -94,6 +98,7 @@ if __name__ == '__main__':
     certainty_progression = []
     features_progression = []
     cross_validation_results = []
+    results = (prediction_results, certainty_progression, features_progression, cross_validation_results)
     bootstrapped_instances = []
     bootstrapped_targets = []
 
@@ -119,18 +124,17 @@ if __name__ == '__main__':
                     candidates_limit=args.candidates_limit, error_sigma=args.error_sigma, folds=args.folds)
 
                 if semisupervised.run(CLASSIFIERS[args.classifier], config) > 0:
-                    if args.folds > 0:
-                        pr, cp, fp, cv = semisupervised.get_results()
-                        cv.insert(0, 'lema', lemma)
-                        cross_validation_results.append(cv)
-                    else:
-                        pr, cp, fp = semisupervised.get_results()
-                    pr.insert(0, 'lemma', lemma)
-                    cp.insert(0, 'lemma', lemma)
-                    fp.insert(0, 'lemma', lemma)
-                    prediction_results.append(pr)
-                    certainty_progression.append(cp)
-                    features_progression.append(fp)
+                    for rst_agg, rst in zip(results, semisupervised.get_results()):
+                        if rst:
+                            rst.insert(0, 'folds', args.folds if args.folds > 0 else 'NA')
+                            rst.insert(0, 'num_classes', semisupervised.classes.shape[0])
+                            rst.insert(0, 'lemma', lemma)
+                            rst.insert(0, 'layers', '_'.join(str(l) for l in args.layers) if args.layers else 'NA')
+                            rst.insert(0, 'classifier', args.classifier)
+                            rst.insert(0, 'vector_domain', args.vector_domain or 'NA')
+                            rst.insert(0, 'representation', args.representation or 'NA')
+                            rst.insert(0, 'corpus', args.corpus_name)
+                            rst_agg.append(rst)
 
                     # Save the bootstrapped data
                     bi, bt = semisupervised.bootstrapped()
@@ -159,4 +163,3 @@ if __name__ == '__main__':
     if cross_validation_results:
         pd.concat(cross_validation_results, ignore_index=True) \
             .to_csv('%s_cross_validation_results.csv' % args.base_results_path, index=False, float_format='%d')
-

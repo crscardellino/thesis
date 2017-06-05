@@ -39,9 +39,9 @@ if __name__ == '__main__':
     parser.add_argument('--error_sigma', type=float, default=0.1)
     parser.add_argument('--random_seed', type=int, default=1234)
     parser.add_argument('--folds', type=int, default=0)
-    parser.add_argument('--corpus_name', default='')
-    parser.add_argument('--representation', default='')
-    parser.add_argument('--vector_domain', default='')
+    parser.add_argument('--corpus_name', default='NA')
+    parser.add_argument('--representation', default='NA')
+    parser.add_argument('--vector_domain', default='NA')
 
     args = parser.parse_args()
 

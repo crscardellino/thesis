@@ -215,6 +215,8 @@ if __name__ == '__main__':
                 test_results.insert(0, 'corpus_split', 'test')
 
                 lemma_results = pd.concat([train_results, test_results], ignore_index=True)
+
+                # Add experiments metadata
                 lemma_results.insert(0, 'num_classes', labels.shape[0])
                 lemma_results.insert(0, 'lemma', lemma)
                 lemma_results.insert(0, 'layers', '_'.join(str(l) for l in args.layers) if args.layers else 'NA')

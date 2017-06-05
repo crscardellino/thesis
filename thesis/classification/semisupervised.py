@@ -65,6 +65,10 @@ class SemiSupervisedWrapper(object):
         self._candidates_selection = candidates_selection
         self._candidates_limit = candidates_limit
 
+    @property
+    def classes(self):
+        return self._classes
+
     def _get_candidates(self, prediction_probabilities):
         # Get the max probabilities per target
         max_probabilities = prediction_probabilities.max(axis=1)
@@ -191,11 +195,10 @@ class SemiSupervisedWrapper(object):
         certainty_progression = pd.concat(self._certainty_progression, ignore_index=True)
         features_progression = pd.concat(self._features_progression, ignore_index=True)
 
-        if self._folds > 0:
-            cross_validation_results = pd.concat(self._cross_validation_results, ignore_index=True)
-            return prediction_results, certainty_progression, features_progression, cross_validation_results
-        else:
-            return prediction_results, certainty_progression, features_progression
+        cross_validation_results = pd.concat(self._cross_validation_results, ignore_index=True)\
+            if self._folds > 0 else None
+
+        return prediction_results, certainty_progression, features_progression, cross_validation_results
 
     def run(self, model_class, model_config):
         self._model = model_class(**model_config)

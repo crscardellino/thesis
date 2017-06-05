@@ -106,7 +106,7 @@ if __name__ == '__main__':
     else:
         simulation_indices = np.load(args.simulation_indices_path)
         initial_indices = simulation_indices['initial_indices']
-        unlabeled_indices = simulation_indices['unlabel_indices']
+        unlabeled_indices = simulation_indices['unlabeled_indices']
         unlabeled_dataset = None
 
     prediction_results = []
@@ -139,16 +139,15 @@ if __name__ == '__main__':
                     data = data[li]
                     target = target[li]
 
-                semisupervised = ActiveLearningWrapper(
-                    labeled_train_data=data, labeled_train_target=target,
-                    labeled_test_data=labeled_datasets.test_dataset.data(lemma),
-                    labeled_test_target=labeled_datasets.test_dataset.target(lemma),
-                    unlabeled_data=unlabeled_data, unlabeled_target=unlabeled_target,
-                    labeled_features=features, min_count=args.min_count, validation_ratio=args.validation_ratio,
-                    acceptance_threshold=args.acceptance_threshold, candidates_selection=args.candidates_selection,
-                    unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
-                    candidates_limit=args.candidates_limit, error_sigma=args.error_sigma, folds=args.folds,
-                    random_seed=args.random_seed)
+                    semisupervised = ActiveLearningWrapper(
+                        labeled_train_data=data, labeled_train_target=target,
+                        labeled_test_data=labeled_datasets.test_dataset.data(lemma),
+                        labeled_test_target=labeled_datasets.test_dataset.target(lemma),
+                        unlabeled_data=unlabeled_data, unlabeled_target=unlabeled_target,
+                        labeled_features=features, min_count=args.min_count, validation_ratio=args.validation_ratio,
+                        candidates_selection=args.candidates_selection, candidates_limit=args.candidates_limit,
+                        unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
+                        error_sigma=args.error_sigma, folds=args.folds, random_seed=args.random_seed)
 
                 if semisupervised.run(CLASSIFIERS[args.classifier], config) > 0:
                     for rst_agg, rst in zip(results, semisupervised.get_results()):

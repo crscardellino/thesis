@@ -288,6 +288,12 @@ class ActiveLearningWrapper(SemiSupervisedWrapper):
         super(ActiveLearningWrapper, self).__init__(**kwargs)
 
     def _get_target_candidates(self, prediction_probabilities=None, candidates=None):
-        bootstrap_mask = np.ones(self._unlabeled_data.shape[0], dtype=np.bool)
-        bootstrap_mask[self._bootstrapped_indices] = False
-        masked_unlabeled_target = self._unlabeled_target[bootstrap_mask]
+        if self._unlabeled_target:
+            bootstrap_mask = np.ones(self._unlabeled_data.shape[0], dtype=np.bool)
+            bootstrap_mask[self._bootstrapped_indices] = False
+            unlabeled_target = self._unlabeled_target[bootstrap_mask]
+
+            return unlabeled_target
+        else:
+            # TODO This is not for simulations
+            raise NotImplementedError('This needs human interaction. Not yet available.')

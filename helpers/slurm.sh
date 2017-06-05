@@ -24,7 +24,7 @@
 CWD=$PWD
 cd `dirname $1`
 mkdir -p logs
-srun -o logs/%j.out -e logs/%j.err /usr/bin/env bash `basename $1` $*
+srun -o logs/%j.out -e logs/%j.err /usr/bin/env ruby `basename $1`
 cd $CWD
 
 exit 0

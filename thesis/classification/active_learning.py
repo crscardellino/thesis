@@ -168,16 +168,13 @@ if __name__ == '__main__':
                             rst.insert(0, 'corpus', args.corpus_name)
                             rst_agg.append(rst)
 
-                    # Save the bootstrapped data
-                    bi, bt = semisupervised.bootstrapped()
-                    bootstrapped_targets.extend(bt)
-
+                    # Save the bootstrapped data (if there is unlabeled data to save)
                     if unlabeled_dataset is not None:
+                        bi, bt = semisupervised.bootstrapped()
+                        bootstrapped_targets.extend(bt)
+
                         ul_instances = unlabeled_dataset.instances_id(lemma, limit=args.unlabeled_data_limit)
                         bootstrapped_instances.extend(':'.join(ul_instances[idx]) for idx in bi)
-                    else:
-                        bootstrapped_instances.extend(ui)
-
                 else:
                     tqdm.write('The lemma %s didn\'t run iterations' % lemma, file=sys.stderr)
         except NotEnoughSensesError:
@@ -187,8 +184,9 @@ if __name__ == '__main__':
 
     print('Saving results', file=sys.stderr)
 
-    pd.DataFrame({'instance': bootstrapped_instances, 'predicted_target': bootstrapped_targets}) \
-        .to_csv('%s_unlabeled_dataset_predictions.csv' % args.base_results_path, index=False)
+    if unlabeled_dataset is not None:
+        pd.DataFrame({'instance': bootstrapped_instances, 'predicted_target': bootstrapped_targets}) \
+            .to_csv('%s_unlabeled_dataset_predictions.csv' % args.base_results_path, index=False)
     pd.concat(prediction_results, ignore_index=True) \
         .to_csv('%s_prediction_results.csv' % args.base_results_path, index=False, float_format='%d')
     pd.concat(certainty_progression, ignore_index=True) \

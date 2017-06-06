@@ -37,7 +37,7 @@ if __name__ == '__main__':
     parser.add_argument('--unlabeled_data_limit', type=int, default=1000)
     parser.add_argument('--candidates_limit', type=int, default=0)
     parser.add_argument('--min_count', type=int, default=2)
-    parser.add_argument('--validation_ratio', type=float, default=0.1)
+    parser.add_argument('--validation_ratio', type=float, default=0.2)
     parser.add_argument('--candidates_selection', default='min')
     parser.add_argument('--error_sigma', type=float, default=0.1)
     parser.add_argument('--random_seed', type=int, default=1234)

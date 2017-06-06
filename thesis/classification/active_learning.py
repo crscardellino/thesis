@@ -129,7 +129,7 @@ if __name__ == '__main__':
             with tf.Session() as sess:
                 keras_backend.set_session(sess)
 
-                if unlabeled_dataset:
+                if unlabeled_dataset is not None:
                     unlabeled_data = unlabeled_dataset.data(lemma, limit=args.unlabeled_data_limit)
                     unlabeled_target = None
                     unlabeled_features = unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit)
@@ -151,11 +151,11 @@ if __name__ == '__main__':
                     labeled_features=features, min_count=args.min_count, validation_ratio=args.validation_ratio,
                     candidates_selection=args.candidates_selection, candidates_limit=args.candidates_limit,
                     unlabeled_features=unlabeled_features, error_sigma=args.error_sigma, folds=args.folds,
-                    random_seed=args.random_seed)
+                    random_seed=args.random_seed, acceptance_threshold=0)
 
                 if semisupervised.run(CLASSIFIERS[args.classifier], config) > 0:
                     for rst_agg, rst in zip(results, semisupervised.get_results()):
-                        if rst:
+                        if rst is not None:
                             rst.insert(0, 'folds', args.folds if args.folds > 0 else 'NA')
                             rst.insert(0, 'num_classes', semisupervised.classes.shape[0])
                             rst.insert(0, 'lemma', lemma)
@@ -172,8 +172,12 @@ if __name__ == '__main__':
                     bi, bt = semisupervised.bootstrapped()
                     bootstrapped_targets.extend(bt)
 
-                    ul_instances = unlabeled_dataset.instances_id(lemma, limit=args.unlabeled_data_limit)
-                    bootstrapped_instances.extend(':'.join(ul_instances[idx]) for idx in bi)
+                    if unlabeled_dataset is not None:
+                        ul_instances = unlabeled_dataset.instances_id(lemma, limit=args.unlabeled_data_limit)
+                        bootstrapped_instances.extend(':'.join(ul_instances[idx]) for idx in bi)
+                    else:
+                        bootstrapped_instances.extend(ui)
+
                 else:
                     tqdm.write('The lemma %s didn\'t run iterations' % lemma, file=sys.stderr)
         except NotEnoughSensesError:

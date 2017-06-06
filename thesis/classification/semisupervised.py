@@ -239,6 +239,9 @@ class SemiSupervisedWrapper(object):
             train_data = sps.vstack(train_data) if sps.issparse(self._labeled_train_data) else np.vstack(train_data)
             train_target = np.concatenate((self._labeled_train_target, self._bootstrapped_targets, target_candidates))
 
+            assert train_data.shape[0] == train_target.shape[0],\
+                'The train data and target have different shapes: %d != %d' % (train_data.shape[0], train_target.shape[0])
+
             # Train the new model and check validation
             validation_errors, cross_validation, validation_error, new_model = self._validate(
                 model_class, model_config, train_data, train_target, iteration
@@ -288,12 +291,8 @@ class ActiveLearningWrapper(SemiSupervisedWrapper):
         super(ActiveLearningWrapper, self).__init__(**kwargs)
 
     def _get_target_candidates(self, prediction_probabilities=None, candidates=None):
-        if self._unlabeled_target:
-            bootstrap_mask = np.ones(self._unlabeled_data.shape[0], dtype=np.bool)
-            bootstrap_mask[self._bootstrapped_indices] = False
-            unlabeled_target = self._unlabeled_target[bootstrap_mask]
-
-            return unlabeled_target
+        if self._unlabeled_target is not None:
+            return self._unlabeled_target[candidates]
         else:
             # TODO This is not for simulations
             raise NotImplementedError('This needs human interaction. Not yet available.')

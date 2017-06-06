@@ -10,6 +10,7 @@ import pandas as pd
 import sys
 import tensorflow as tf
 
+from itertools import compress
 from keras import backend as keras_backend
 from thesis.classification.semisupervised import ActiveLearningWrapper
 from thesis.dataset import SenseCorpusDatasets, UnlabeledCorpusDataset
@@ -131,23 +132,26 @@ if __name__ == '__main__':
                 if unlabeled_dataset:
                     unlabeled_data = unlabeled_dataset.data(lemma, limit=args.unlabeled_data_limit)
                     unlabeled_target = None
+                    unlabeled_features = unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit)
                 else:
                     li = np.in1d(labeled_datasets.train_dataset.lemmas_index(lemma), initial_indices)
                     ui = np.in1d(labeled_datasets.train_dataset.lemmas_index(lemma), unlabeled_indices)
                     unlabeled_data = data[ui]
                     unlabeled_target = target[ui]
+                    unlabeled_features = list(compress(features, ui))
                     data = data[li]
                     target = target[li]
+                    features = list(compress(features, li))
 
-                    semisupervised = ActiveLearningWrapper(
-                        labeled_train_data=data, labeled_train_target=target,
-                        labeled_test_data=labeled_datasets.test_dataset.data(lemma),
-                        labeled_test_target=labeled_datasets.test_dataset.target(lemma),
-                        unlabeled_data=unlabeled_data, unlabeled_target=unlabeled_target,
-                        labeled_features=features, min_count=args.min_count, validation_ratio=args.validation_ratio,
-                        candidates_selection=args.candidates_selection, candidates_limit=args.candidates_limit,
-                        unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
-                        error_sigma=args.error_sigma, folds=args.folds, random_seed=args.random_seed)
+                semisupervised = ActiveLearningWrapper(
+                    labeled_train_data=data, labeled_train_target=target,
+                    labeled_test_data=labeled_datasets.test_dataset.data(lemma),
+                    labeled_test_target=labeled_datasets.test_dataset.target(lemma),
+                    unlabeled_data=unlabeled_data, unlabeled_target=unlabeled_target,
+                    labeled_features=features, min_count=args.min_count, validation_ratio=args.validation_ratio,
+                    candidates_selection=args.candidates_selection, candidates_limit=args.candidates_limit,
+                    unlabeled_features=unlabeled_features, error_sigma=args.error_sigma, folds=args.folds,
+                    random_seed=args.random_seed)
 
                 if semisupervised.run(CLASSIFIERS[args.classifier], config) > 0:
                     for rst_agg, rst in zip(results, semisupervised.get_results()):

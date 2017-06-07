@@ -137,7 +137,7 @@ if __name__ == '__main__':
                  total=labeled_datasets.train_dataset.num_lemmas):
         if unlabeled_dataset and not unlabeled_dataset.has_lemma(lemma):
             continue
-        if args.annotation_lemmas and not lemma in args.annotation_lemmas:
+        if args.annotation_lemmas and lemma not in args.annotation_lemmas:
             continue
         try:
             tf.reset_default_graph()
@@ -172,7 +172,7 @@ if __name__ == '__main__':
                     candidates_selection=args.candidates_selection, candidates_limit=args.candidates_limit,
                     unlabeled_features=unlabeled_features, error_sigma=args.error_sigma, folds=args.folds,
                     random_seed=args.random_seed, acceptance_threshold=0, train_classes=train_classes,
-                    sentences_path=args.sentences_path, unlabeled_sentences=lemma_unlabeled_sentences, lemma=lemma
+                    unlabeled_sentences=lemma_unlabeled_sentences, lemma=lemma
                 )
 
                 if semisupervised.run(CLASSIFIERS[args.classifier], config) > 0:

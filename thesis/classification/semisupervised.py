@@ -302,7 +302,7 @@ class ActiveLearningWrapper(SemiSupervisedWrapper):
         if self._unlabeled_target is not None:
             return self._unlabeled_target[bootstrap_mask][candidates]
         else:
-            ul_sentences = compress(self._unlabeled_sentences, bootstrap_mask)
+            ul_sentences = list(compress(self._unlabeled_sentences, bootstrap_mask))
             ul_sentences = [ul_sentences[idx] for idx in candidates]
             labeled_targets = []
 

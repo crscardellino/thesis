@@ -127,8 +127,7 @@ class CorpusDataset(object):
         if lemma is None:
             features_dict = self._features_dicts
         else:
-            instances = set(np.where(self._lemmas == lemma)[0])
-            features_dict = [fd for idx, fd in enumerate(self._features_dicts) if idx in instances]
+            features_dict = [self._features_dicts[idx] for idx in np.where(self._lemmas == lemma)[0]]
 
         limit = min(limit, len(features_dict))
 
@@ -225,8 +224,7 @@ class UnlabeledCorpusDataset(CorpusDataset):
         if lemma is None:
             instances_id = self._instances_id
         else:
-            instances = set(np.where(self._lemmas == lemma)[0])
-            instances_id = [iid for idx, iid in enumerate(self._instances_id) if idx in instances]
+            instances_id = [self._instances_id[idx] for idx in np.where(self._lemmas == lemma)[0]]
 
         limit = min(limit, len(instances_id))
 

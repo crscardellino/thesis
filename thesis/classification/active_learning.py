@@ -25,6 +25,7 @@ if __name__ == '__main__':
     parser.add_argument('labeled_dataset_path')
     parser.add_argument('base_results_path')
     parser.add_argument('--unlabeled_dataset_path', default=None)
+    parser.add_argument('--sentences_path', default=None)
     parser.add_argument('--simulation_indices_path', default=None)
     parser.add_argument('--word_vector_model_path', default=None)
     parser.add_argument('--labeled_dataset_extra', default=None)
@@ -42,6 +43,7 @@ if __name__ == '__main__':
     parser.add_argument('--error_sigma', type=float, default=0.1)
     parser.add_argument('--random_seed', type=int, default=1234)
     parser.add_argument('--folds', type=int, default=0)
+    parser.add_argument('--annotation_lemmas', nargs='+', default=set())
     parser.add_argument('--corpus_name', default='NA')
     parser.add_argument('--representation', default='NA')
     parser.add_argument('--vector_domain', default='NA')
@@ -60,6 +62,10 @@ if __name__ == '__main__':
 
     args.classifier_config = [args.classifier_config] \
         if isinstance(args.classifier_config, tuple) else args.classifier_config
+
+    if args.annotation_lemmas:
+        args.annotation_lemmas = set(args.annotation_lemmas) if not isinstance(args.annotation_lemmas, set) else\
+            args.annotation_lemmas
 
     for key, value in args.classifier_config:
         config[key] = try_number(value)
@@ -117,12 +123,21 @@ if __name__ == '__main__':
     results = (prediction_results, certainty_progression, features_progression, cross_validation_results)
     bootstrapped_instances = []
     bootstrapped_targets = []
+    text_sentences = {}
+
+    if args.sentences_path is not None:
+        with open(args.sentences_path, 'r') as sfin:
+            for line in sfin:
+                iid, sent = line.strip().split('\t', 1)
+                text_sentences[iid] = sent
 
     print('Running experiments per lemma', file=sys.stderr)
     for lemma, data, target, features in \
             tqdm(labeled_datasets.train_dataset.traverse_dataset_by_lemma(return_features=True),
                  total=labeled_datasets.train_dataset.num_lemmas):
         if unlabeled_dataset and not unlabeled_dataset.has_lemma(lemma):
+            continue
+        if args.annotation_lemmas and not lemma in args.annotation_lemmas:
             continue
         try:
             tf.reset_default_graph()
@@ -133,6 +148,9 @@ if __name__ == '__main__':
                     unlabeled_data = unlabeled_dataset.data(lemma, limit=args.unlabeled_data_limit)
                     unlabeled_target = None
                     unlabeled_features = unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit)
+                    instances_id = unlabeled_dataset.instances_id(lemma, limit=args.unlabeled_data_limit)
+                    lemma_unlabeled_sentences = [text_sentences[':'.join(iid)] for iid in instances_id]
+                    train_classes = labeled_datasets.train_dataset.train_classes
                 else:
                     li = np.in1d(labeled_datasets.train_dataset.lemmas_index(lemma), initial_indices)
                     ui = np.in1d(labeled_datasets.train_dataset.lemmas_index(lemma), unlabeled_indices)
@@ -142,6 +160,8 @@ if __name__ == '__main__':
                     data = data[li]
                     target = target[li]
                     features = list(compress(features, li))
+                    lemma_unlabeled_sentences = None
+                    train_classes = None
 
                 semisupervised = ActiveLearningWrapper(
                     labeled_train_data=data, labeled_train_target=target,
@@ -151,7 +171,9 @@ if __name__ == '__main__':
                     labeled_features=features, min_count=args.min_count, validation_ratio=args.validation_ratio,
                     candidates_selection=args.candidates_selection, candidates_limit=args.candidates_limit,
                     unlabeled_features=unlabeled_features, error_sigma=args.error_sigma, folds=args.folds,
-                    random_seed=args.random_seed, acceptance_threshold=0)
+                    random_seed=args.random_seed, acceptance_threshold=0, train_classes=train_classes,
+                    sentences_path=args.sentences_path, unlabeled_sentences=lemma_unlabeled_sentences, lemma=lemma
+                )
 
                 if semisupervised.run(CLASSIFIERS[args.classifier], config) > 0:
                     for rst_agg, rst in zip(results, semisupervised.get_results()):

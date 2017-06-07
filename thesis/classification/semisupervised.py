@@ -7,6 +7,7 @@ import pandas as pd
 import scipy.sparse as sps
 import sys
 
+from itertools import compress
 from sklearn.metrics import zero_one_loss
 from sklearn.model_selection import StratifiedKFold, KFold
 from thesis.dataset.utils import filter_minimum, validation_split
@@ -24,7 +25,7 @@ def _feature_transformer(feature):
 class SemiSupervisedWrapper(object):
     def __init__(self, labeled_train_data, labeled_train_target, labeled_test_data, labeled_test_target,
                  unlabeled_data, labeled_features, unlabeled_features, min_count=2, validation_ratio=0.1,
-                 acceptance_threshold=0.8, candidates_selection='max', candidates_limit=0, error_sigma=2,
+                 lemma='', acceptance_threshold=0.8, candidates_selection='max', candidates_limit=0, error_sigma=2,
                  folds=0, random_seed=RANDOM_SEED):
         filtered_values = filter_minimum(target=labeled_train_target[:], min_count=min_count)
 
@@ -48,6 +49,7 @@ class SemiSupervisedWrapper(object):
         self._unlabeled_data = unlabeled_data
         self._unlabeled_features = unlabeled_features
 
+        self._lemma = lemma
         self._classes = np.unique(self._labeled_train_target)
         self._bootstrapped_indices = []
         self._bootstrapped_targets = []
@@ -288,11 +290,32 @@ class SelfLearningWrapper(SemiSupervisedWrapper):
 class ActiveLearningWrapper(SemiSupervisedWrapper):
     def __init__(self, **kwargs):
         self._unlabeled_target = kwargs.pop('unlabeled_target', None)
+        self._unlabeled_sentences = kwargs.pop('unlabeled_sentences', None)
+        self._train_classes = kwargs.pop('train_classes', None)
+
         super(ActiveLearningWrapper, self).__init__(**kwargs)
 
     def _get_target_candidates(self, prediction_probabilities=None, candidates=None):
+        bootstrap_mask = np.ones(self._unlabeled_data.shape[0], dtype=np.bool)
+        bootstrap_mask[self._bootstrapped_indices] = False
+
         if self._unlabeled_target is not None:
-            return self._unlabeled_target[candidates]
+            return self._unlabeled_target[bootstrap_mask][candidates]
         else:
-            # TODO This is not for simulations
-            raise NotImplementedError('This needs human interaction. Not yet available.')
+            ul_sentences = compress(self._unlabeled_sentences, bootstrap_mask)
+            ul_sentences = [ul_sentences[idx] for idx in candidates]
+            labeled_targets = []
+
+            for sentence in ul_sentences:
+                print('*' * 50 + '\n%s' % sentence, file=sys.stderr)
+                print('*' * 50 + '\nSelect the sense for the previous sentence:', file=sys.stderr)
+                for idx, sense in enumerate(self._train_classes):
+                    _, lemma, sense = sense.split('.', 3)
+                    if lemma != self._lemma:
+                        continue
+                    print('%d ) %s' % (idx, sense), file=sys.stderr)
+                sense = input('Sense: ')
+                print(file=sys.stderr)
+                labeled_targets.append(int(sense))
+
+            return labeled_targets

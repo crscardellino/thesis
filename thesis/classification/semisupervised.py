@@ -242,7 +242,8 @@ class SemiSupervisedWrapper(object):
             train_target = np.concatenate((self._labeled_train_target, self._bootstrapped_targets, target_candidates))
 
             assert train_data.shape[0] == train_target.shape[0],\
-                'The train data and target have different shapes: %d != %d' % (train_data.shape[0], train_target.shape[0])
+                'The train data and target have different shapes: %d != %d' % (train_data.shape[0],
+                                                                               train_target.shape[0])
 
             # Train the new model and check validation
             validation_errors, cross_validation, validation_error, new_model = self._validate(

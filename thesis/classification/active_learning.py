@@ -113,14 +113,16 @@ if __name__ == '__main__':
         initial_indices = None
         unlabeled_indices = None
 
-        with open(args.full_senses_path, 'rb') as f:
-            full_senses_dict = pickle.load(f)
     else:
         simulation_indices = np.load(args.simulation_indices_path)
         initial_indices = simulation_indices['initial_indices']
         unlabeled_indices = simulation_indices['unlabeled_indices']
         unlabeled_dataset = None
         full_senses_dict = None
+
+    if args.full_senses_path is not None:
+        with open(args.full_senses_path, 'rb') as f:
+            full_senses_dict = pickle.load(f)
 
     prediction_results = []
     certainty_progression = []
@@ -209,7 +211,8 @@ if __name__ == '__main__':
                             rst.insert(0, 'corpus', args.corpus_name)
                             rst_agg.append(rst)
 
-                    senses.append(semisupervised.get_senses())
+                    if args.full_senses_path is not None:
+                        senses.append(semisupervised.get_senses())
 
                     # Save the bootstrapped data (if there is unlabeled data to save)
                     if unlabeled_dataset is not None:
@@ -236,8 +239,10 @@ if __name__ == '__main__':
         .to_csv('%s_certainty_progression.csv' % args.base_results_path, index=False, float_format='%.2e')
     pd.concat(features_progression, ignore_index=True) \
         .to_csv('%s_features_progression.csv' % args.base_results_path, index=False, float_format='%d')
-    pd.concat(senses, ignore_index=True).\
-        to_csv('%s_senses_description.csv' % args.base_results_path, index=False, float='%d')
+
+    if senses:
+        pd.concat(senses, ignore_index=True).\
+            to_csv('%s_senses_description.csv' % args.base_results_path, index=False, float='%d')
 
     if cross_validation_results:
         pd.concat(cross_validation_results, ignore_index=True) \

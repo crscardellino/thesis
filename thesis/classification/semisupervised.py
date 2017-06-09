@@ -316,7 +316,7 @@ class ActiveLearningWrapper(SemiSupervisedWrapper):
                 for idx, (sense, description) in enumerate(self._senses):
                     print('%d ) %s: %s' % (idx, sense, description), file=sys.stderr)
                 sense = input('Sense: ')
-                while not sense.isdigit() or not (0 <= int(sense) <= len(self._senses)):
+                while not sense.isdigit() or not (0 <= int(sense) < len(self._senses)):
                     sense = input('Sense: ')
                 sense = int(sense)
 
@@ -333,5 +333,5 @@ class ActiveLearningWrapper(SemiSupervisedWrapper):
         senses_description = dict(self._senses)
         senses = []
         for sense in self._train_classes:
-            senses.append((self._train_classes[sense], sense, senses_description[sense]))
+            senses.append((self._train_classes[sense], sense, senses_description[sense] if sense in senses_description else 'NA'))
         return pd.DataFrame(senses, columns=['id', 'sense', 'description'])

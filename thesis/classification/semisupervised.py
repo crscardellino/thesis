@@ -293,11 +293,11 @@ class ActiveLearningWrapper(SemiSupervisedWrapper):
         self._unlabeled_target = kwargs.pop('unlabeled_target', np.array([]))
         self._unlabeled_sentences = kwargs.pop('unlabeled_sentences', None)
         self._train_classes = kwargs.pop('train_classes', None)
-
         full_senses_dict = kwargs.pop('full_senses_dict', None)
-        self._senses = sorted(full_senses_dict[self._lemma].items()) if full_senses_dict else None
 
         super(ActiveLearningWrapper, self).__init__(**kwargs)
+
+        self._senses = sorted(full_senses_dict[self._lemma].items()) if full_senses_dict else None
 
     def _get_target_candidates(self, prediction_probabilities=None, candidates=None):
         bootstrap_mask = np.ones(self._unlabeled_data.shape[0], dtype=np.bool)

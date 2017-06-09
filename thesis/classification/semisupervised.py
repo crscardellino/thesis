@@ -328,3 +328,10 @@ class ActiveLearningWrapper(SemiSupervisedWrapper):
                 labeled_targets.append(self._train_classes[self._senses[sense][0]])
 
             return labeled_targets
+
+    def get_senses(self):
+        senses_description = dict(self._senses)
+        senses = []
+        for sense in self._train_classes:
+            senses.append((self._train_classes[sense], sense, senses_description[sense]))
+        return pd.DataFrame(senses, columns=['id', 'sense', 'description'])

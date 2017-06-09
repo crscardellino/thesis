@@ -126,6 +126,7 @@ if __name__ == '__main__':
     certainty_progression = []
     features_progression = []
     cross_validation_results = []
+    senses = []
     results = (prediction_results, certainty_progression, features_progression, cross_validation_results)
     bootstrapped_instances = []
     bootstrapped_targets = []
@@ -208,6 +209,8 @@ if __name__ == '__main__':
                             rst.insert(0, 'corpus', args.corpus_name)
                             rst_agg.append(rst)
 
+                    senses.append(semisupervised.get_senses())
+
                     # Save the bootstrapped data (if there is unlabeled data to save)
                     if unlabeled_dataset is not None:
                         bi, bt = semisupervised.bootstrapped()
@@ -233,6 +236,8 @@ if __name__ == '__main__':
         .to_csv('%s_certainty_progression.csv' % args.base_results_path, index=False, float_format='%.2e')
     pd.concat(features_progression, ignore_index=True) \
         .to_csv('%s_features_progression.csv' % args.base_results_path, index=False, float_format='%d')
+    pd.concat(senses, ignore_index=True).\
+        to_csv('%s_senses_description.csv' % args.base_results_path, index=False, float='%d')
 
     if cross_validation_results:
         pd.concat(cross_validation_results, ignore_index=True) \

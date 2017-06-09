@@ -13,26 +13,8 @@ import sys
 from scipy.sparse import vstack
 from thesis.feature_extraction import (HandcraftedHashedFeaturesExtractor, WordWindowExtractor)
 from thesis.parsers import ColumnCorpusParser
-from thesis.utils import SEMEVAL_COLUMNS, SENSEM_COLUMNS
+from thesis.constants import DEFAULT_FEATURES, LANGUAGE, CORPUS_COLUMNS
 from tqdm import tqdm
-
-
-_DEFAULT_FEATURES = {
-    'main_token': True, 'main_lemma': True, 'main_tag': True, 'main_morpho': True,
-    'window_bow': True, 'window_tokens': True, 'window_lemmas': True, 'window_tags': True,
-    'surrounding_bigrams': True, 'surrounding_trigrams': True,
-    'inbound_dep_triples': True, 'outbound_dep_triples': True
-}
-
-_CORPUS_COLUMNS = {
-    'semeval': SEMEVAL_COLUMNS,
-    'sensem': SENSEM_COLUMNS
-}
-
-_LANGUAGE = {
-    'spanish': 'sensem',
-    'english': 'semeval'
-}
 
 
 if __name__ == '__main__':
@@ -47,6 +29,10 @@ if __name__ == '__main__':
     parser.add_argument('corpus_labels',
                         type=str,
                         help='Path to pickle file to get lemmas from corpora.')
+    parser.add_argument('--ww_path',
+                        type=str,
+                        default=None,
+                        help='If given, stores the word windows in the given path.')
     parser.add_argument('--corpus_language',
                         type=str,
                         default='spanish',
@@ -55,9 +41,6 @@ if __name__ == '__main__':
                         type=int,
                         default=1000,
                         help='Maximum number of instances per lemma (default: 1000).')
-    parser.add_argument('--windowizer',
-                        action='store_true',
-                        help='If active use word window extractor.')
     parser.add_argument('--hashed_features',
                         type=int,
                         default=2**10,
@@ -77,19 +60,20 @@ if __name__ == '__main__':
     args.ignored_features = [args.ignored_features] \
         if isinstance(args.ignored_features, str) else args.ignored_features
 
-    features = _DEFAULT_FEATURES.copy()
+    features = DEFAULT_FEATURES.copy()
 
     for ignored_feature in args.ignored_features:
         features.pop(ignored_feature, None)
 
     features['window_size'] = args.window_size
 
-    if not args.windowizer:
-        extractor = HandcraftedHashedFeaturesExtractor(
-            n_features=args.hashed_features, return_features_dict=True,
-            **features)
-    else:
-        extractor = WordWindowExtractor(args.window_size)
+    extractor = HandcraftedHashedFeaturesExtractor(
+        n_features=args.hashed_features, return_features_dict=True,
+        **features)
+    ww_extractor = None
+
+    if args.ww_path is not None:
+        ww_extractor = WordWindowExtractor(args.window_size)
 
     if os.path.isfile(args.save_path):
         os.remove(args.save_path)
@@ -99,36 +83,40 @@ if __name__ == '__main__':
     os.makedirs(args.save_path)
 
     instances = []
-    instances_id = []
     features = []
+    ww_instances = []
+    instances_id = []
 
     with open(args.corpus_labels, 'rb') as f:
         valid_lemmas = pickle.load(f)
         valid_lemmas = {lemma for lemma, (_, count) in
-                        valid_lemmas[_LANGUAGE[args.corpus_language]]['lemmas'].items()
+                        valid_lemmas[LANGUAGE[args.corpus_language]]['lemmas'].items()
                         if count[count >= 3].shape[0] > 1}
 
     print('Getting instances', file=sys.stderr)
 
-    corpora_files = sh.find(args.corpus, '-type', 'f').strip().split('\n')
+    corpora_files = sorted(sh.find(args.corpus, '-type', 'f').strip().split('\n'))
+
+    max_lemma_per_corpus = int(args.max_instances / len(corpora_files)) + 1
+
     for corpus_file in tqdm(corpora_files):
         corpus_file = corpus_file.strip()
-        parser = ColumnCorpusParser(corpus_file, *_CORPUS_COLUMNS[_LANGUAGE[args.corpus_language]])
+        parser = ColumnCorpusParser(corpus_file, *CORPUS_COLUMNS[LANGUAGE[args.corpus_language]])
         lemmas_for_corpus = {lemma: 0 for lemma in valid_lemmas}
 
         for sentence in tqdm(parser.sentences):
             for word in (word for word in sentence if word.tag.startswith('VM') and word.lemma in valid_lemmas
-                         and lemmas_for_corpus[word.lemma] < int(args.max_instances / len(corpora_files)) + 1):
+                         and lemmas_for_corpus[word.lemma] < max_lemma_per_corpus):
                 lemmas_for_corpus[word.lemma] += 1
                 sentence['main_lemma'] = word.lemma
                 sentence['main_lemma_index'] = word.idx
 
-                if args.windowizer:
-                    instances.append(extractor.instantiate_sentence(sentence))
-                else:
-                    instance_features, instance = extractor.instantiate_sentence(sentence)
-                    instances.append(instance)
-                    features.append(instance_features)
+                instance_features, instance = extractor.instantiate_sentence(sentence)
+                instances.append(instance)
+                features.append(instance_features)
+
+                if args.ww_path is not None:
+                    ww_instances.append(ww_extractor.instantiate_sentence(sentence))
 
                 instances_id.append('%s:%s:%d:%s:%d' %
                                     (sentence.corpus_name, sentence.file, sentence.sentence_index,
@@ -136,19 +124,16 @@ if __name__ == '__main__':
 
     print('Saving resources in directory %s' % args.save_path, file=sys.stderr)
 
-    if args.windowizer:
-        matrix = np.array(instances)
-    else:
-        matrix = vstack(instances)
+    matrix = vstack(instances)
+    np.savez_compressed(os.path.join(args.save_path, 'dataset.npz'),
+                        data=matrix.data, indices=matrix.indices, indptr=matrix.indptr,
+                        shape=matrix.shape, instances_id=np.array(instances_id))
+    with open(os.path.join(args.save_path, 'features.p'), 'wb') as f:
+        pickle.dump(features, f)
 
-    if args.windowizer:
-        np.savez_compressed(os.path.join(args.save_path, 'dataset.npz'),
+    if args.ww_path is not None:
+        matrix = np.array(ww_instances)
+        np.savez_compressed(os.path.join(args.ww_path, 'dataset.npz'),
                             data=matrix, instances_id=np.array(instances_id))
-    else:
-        np.savez_compressed(os.path.join(args.save_path, 'dataset.npz'),
-                            data=matrix.data, indices=matrix.indices, indptr=matrix.indptr,
-                            shape=matrix.shape, instances_id=np.array(instances_id))
-        with open(os.path.join(args.save_path, 'features.p'), 'wb') as f:
-            pickle.dump(features, f)
 
     print('Finished', file=sys.stderr)

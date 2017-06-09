@@ -21,6 +21,7 @@ if __name__ == '__main__':
                         help='Output file to write (defaults to STDOUT)')
     parser.add_argument('--sentences',
                         default=27132,
+                        type=int,
                         help='Number of sentences to parse')
     parser.add_argument('--server',
                         default='http://localhost:9000',
@@ -29,7 +30,7 @@ if __name__ == '__main__':
 
     output = sys.stdout if args.output is None else open(args.output, 'w')
 
-    parser = ColumnCorpusParser(args.corpus, 'idx', 'token', 'lemma', 'pos')
+    parser = ColumnCorpusParser(args.corpus, 'idx', 'token', 'lemma', 'tag')
 
     for sidx, sentence in enumerate(tqdm(parser.sentences, total=args.sentences), start=1):
         tokenized_sentences = ' '.join(word.token for word in sentence)
@@ -50,8 +51,13 @@ if __name__ == '__main__':
         else:
             main_lemma_index = original_lemma_idx - 1
 
-        if parsed_sentences[lemma_sentence_idx][main_lemma_index].strip().split()[2] != sentence.main_lemma:
+        new_token, new_lemma = parsed_sentences[lemma_sentence_idx][main_lemma_index].strip().split()[1:3]
+
+        if new_lemma != sentence.main_lemma and new_token != sentence.main_token:
             tqdm.write('NOT FOUND LEMMA for sentence %s' % sentence.sentence_index, file=sys.stdout)
+            printing_sentence = '\n'.join('\n'.join(ps) for ps in parsed_sentences)
+        elif new_lemma != sentence.main_lemma and new_token == sentence.main_token:
+            tqdm.write('TOKEN FOUND WITH DIFFERENT LEMMA for sentence %s' % sentence.sentence_index, file=sys.stdout)
             printing_sentence = '\n'.join('\n'.join(ps) for ps in parsed_sentences)
         else:
             sentence['main_lemma_index'] = str(main_lemma_index + 1)

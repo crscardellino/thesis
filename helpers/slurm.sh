@@ -17,13 +17,6 @@
 ### execution time. Format: days-hours:minutes:seconds -- Max: three days
 #SBATCH --time 3-00:00:00
 
-### Check invocation line
-if [ $# -ne 1 ] || [ ! -f $1 ]
-then
-        echo "[ERROR] Must invoke through \"enqueue_job.sh\""
-        exit 1
-fi
-
 ## ## Load environment modules
 ## module load compilers/gcc/4.9
 
@@ -31,7 +24,7 @@ fi
 CWD=$PWD
 cd `dirname $1`
 mkdir -p logs
-srun -o logs/%j.out -e logs/%j.err /bin/bash `basename $1`
+srun -o logs/%j.out -e logs/%j.err /usr/bin/env ruby `basename $1`
 cd $CWD
 
 exit 0

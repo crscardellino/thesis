@@ -290,9 +290,12 @@ class SelfLearningWrapper(SemiSupervisedWrapper):
 
 class ActiveLearningWrapper(SemiSupervisedWrapper):
     def __init__(self, **kwargs):
-        self._unlabeled_target = kwargs.pop('unlabeled_target', None)
+        self._unlabeled_target = kwargs.pop('unlabeled_target', np.array([]))
         self._unlabeled_sentences = kwargs.pop('unlabeled_sentences', None)
         self._train_classes = kwargs.pop('train_classes', None)
+
+        full_senses_dict = kwargs.pop('full_senses_dict', None)
+        self._senses = sorted(full_senses_dict[self._lemma].items()) if full_senses_dict else None
 
         super(ActiveLearningWrapper, self).__init__(**kwargs)
 
@@ -300,7 +303,7 @@ class ActiveLearningWrapper(SemiSupervisedWrapper):
         bootstrap_mask = np.ones(self._unlabeled_data.shape[0], dtype=np.bool)
         bootstrap_mask[self._bootstrapped_indices] = False
 
-        if self._unlabeled_target is not None:
+        if self._unlabeled_target.shape[0] > 0:
             return self._unlabeled_target[bootstrap_mask][candidates]
         else:
             ul_sentences = list(compress(self._unlabeled_sentences, bootstrap_mask))
@@ -310,13 +313,18 @@ class ActiveLearningWrapper(SemiSupervisedWrapper):
             for sentence in ul_sentences:
                 print('*' * 50 + '\n%s' % sentence, file=sys.stderr)
                 print('*' * 50 + '\nSelect the sense for the previous sentence:', file=sys.stderr)
-                for idx, sense in enumerate(self._train_classes):
-                    _, lemma, sense = sense.split('.', 3)
-                    if lemma != self._lemma:
-                        continue
-                    print('%d ) %s' % (idx, sense), file=sys.stderr)
+                for idx, (sense, description) in enumerate(self._senses):
+                    print('%d ) %s: %s' % (idx, sense, description), file=sys.stderr)
                 sense = input('Sense: ')
+                while not sense.isdigit() or not (0 <= int(sense) <= len(self._senses)):
+                    sense = input('Sense: ')
+                sense = int(sense)
+
                 print(file=sys.stderr)
-                labeled_targets.append(int(sense))
+
+                if self._senses[sense][0] not in self._train_classes:
+                    self._train_classes[self._senses[sense][0]] = len(self._train_classes)
+
+                labeled_targets.append(self._train_classes[self._senses[sense][0]])
 
             return labeled_targets

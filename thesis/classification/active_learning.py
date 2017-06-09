@@ -7,6 +7,7 @@ import json
 import numpy as np
 import os
 import pandas as pd
+import pickle
 import sys
 import tensorflow as tf
 
@@ -25,6 +26,7 @@ if __name__ == '__main__':
     parser.add_argument('labeled_dataset_path')
     parser.add_argument('base_results_path')
     parser.add_argument('--unlabeled_dataset_path', default=None)
+    parser.add_argument('--full_senses_path', default=None)
     parser.add_argument('--sentences_path', default=None)
     parser.add_argument('--simulation_indices_path', default=None)
     parser.add_argument('--word_vector_model_path', default=None)
@@ -110,11 +112,15 @@ if __name__ == '__main__':
                                                    dataset_extra=unlabeled_dataset_extra_path)
         initial_indices = None
         unlabeled_indices = None
+
+        with open(args.full_senses_path, 'rb') as f:
+            full_senses_dict = pickle.load(f)
     else:
         simulation_indices = np.load(args.simulation_indices_path)
         initial_indices = simulation_indices['initial_indices']
         unlabeled_indices = simulation_indices['unlabeled_indices']
         unlabeled_dataset = None
+        full_senses_dict = None
 
     prediction_results = []
     certainty_progression = []
@@ -146,11 +152,10 @@ if __name__ == '__main__':
 
                 if unlabeled_dataset is not None:
                     unlabeled_data = unlabeled_dataset.data(lemma, limit=args.unlabeled_data_limit)
-                    unlabeled_target = None
+                    unlabeled_target = np.array([])
                     unlabeled_features = unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit)
                     instances_id = unlabeled_dataset.instances_id(lemma, limit=args.unlabeled_data_limit)
                     lemma_unlabeled_sentences = [text_sentences[':'.join(iid)] for iid in instances_id]
-                    train_classes = labeled_datasets.train_dataset.train_classes
                 else:
                     li = np.in1d(labeled_datasets.train_dataset.lemmas_index(lemma), initial_indices)
                     ui = np.in1d(labeled_datasets.train_dataset.lemmas_index(lemma), unlabeled_indices)
@@ -161,18 +166,31 @@ if __name__ == '__main__':
                     target = target[li]
                     features = list(compress(features, li))
                     lemma_unlabeled_sentences = None
-                    train_classes = None
+
+                test_data = labeled_datasets.test_dataset.data(lemma)
+                test_target = labeled_datasets.test_dataset.target(lemma)
+
+                _, zero_based_indices = np.unique(np.concatenate([target, unlabeled_target, test_target]),
+                                                  return_inverse=True)
+                train_classes = {label: idx for idx, label in
+                                 enumerate(labeled_datasets.train_dataset.train_classes(lemma))}
+
+                train_size = target.shape[0]
+                unlabeled_size = unlabeled_target.shape[0]
+                test_size = test_target.shape[0]
+
+                target = zero_based_indices[:train_size]
+                unlabeled_target = zero_based_indices[train_size:train_size+unlabeled_size]
+                test_target = zero_based_indices[train_size+unlabeled_size:]
 
                 semisupervised = ActiveLearningWrapper(
-                    labeled_train_data=data, labeled_train_target=target,
-                    labeled_test_data=labeled_datasets.test_dataset.data(lemma),
-                    labeled_test_target=labeled_datasets.test_dataset.target(lemma),
-                    unlabeled_data=unlabeled_data, unlabeled_target=unlabeled_target,
-                    labeled_features=features, min_count=args.min_count, validation_ratio=args.validation_ratio,
-                    candidates_selection=args.candidates_selection, candidates_limit=args.candidates_limit,
-                    unlabeled_features=unlabeled_features, error_sigma=args.error_sigma, folds=args.folds,
-                    random_seed=args.random_seed, acceptance_threshold=0, train_classes=train_classes,
-                    unlabeled_sentences=lemma_unlabeled_sentences, lemma=lemma
+                    labeled_train_data=data, labeled_train_target=target, labeled_test_data=test_data,
+                    labeled_test_target=test_target, unlabeled_data=unlabeled_data, unlabeled_target=unlabeled_target,
+                    lemma=lemma, labeled_features=features, min_count=args.min_count, full_senses_dict=full_senses_dict,
+                    validation_ratio=args.validation_ratio, candidates_selection=args.candidates_selection,
+                    candidates_limit=args.candidates_limit, unlabeled_features=unlabeled_features,
+                    error_sigma=args.error_sigma, folds=args.folds, random_seed=args.random_seed,
+                    acceptance_threshold=0, unlabeled_sentences=lemma_unlabeled_sentences, train_classes=train_classes
                 )
 
                 if semisupervised.run(CLASSIFIERS[args.classifier], config) > 0:

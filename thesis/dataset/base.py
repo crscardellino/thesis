@@ -186,9 +186,11 @@ class SenseCorpusDataset(CorpusDataset):
     def num_lemmas(self):
         return self._unique_lemmas.shape[0]
 
-    @property
-    def train_classes(self):
-        return self._train_classes
+    def train_classes(self, lemma=None):
+        if lemma is None:
+            return self._train_classes
+        else:
+            return np.array([cls for cls in self._train_classes if cls.split('.')[1] == lemma])
 
 
 class SenseCorpusDatasets(object):

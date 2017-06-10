@@ -225,7 +225,7 @@ if __name__ == '__main__':
                 else:
                     tqdm.write('Lemma %s - No iterations' % lemma, file=sys.stderr)
         except NotEnoughSensesError:
-            tqdm.write('The lemma %s doesn\'t have enough senses with at least %d occurrences'
+            tqdm.write('Lemma %s - Not enough senses with at least %d occurrences'
                        % (lemma, args.min_count), file=sys.stderr)
             continue
 

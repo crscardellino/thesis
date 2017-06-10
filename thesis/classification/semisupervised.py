@@ -252,7 +252,7 @@ class SemiSupervisedWrapper(object):
                     else:
                         break
                 else:  # There was at least one iteration.
-                    tqdm.write('Lemma: %s - Max predicted probability %.2f - Acceptance threshold: %.2f'
+                    tqdm.write('Lemma %s - Max predicted probability %.2f - Acceptance threshold: %.2f'
                                % (self._lemma, prediction_probabilities.max(), self._acceptance_threshold),
                                file=sys.stderr)
                     break
@@ -307,6 +307,9 @@ class SemiSupervisedWrapper(object):
 
             for corpus_split in ('train', 'validation'):
                 self._add_results(corpus_split, iteration)
+
+        if len(self._bootstrapped_indices) >= self._unlabeled_data.shape[0]:
+            tqdm.write('Lemma %s - Run all iterations' % self._lemma, file=sys.stderr)
 
         for corpus_split in ('train', 'test'):
             self._add_results(corpus_split, 'final')

@@ -8,7 +8,7 @@ CORPORA = %w(sensem)
 LAYERS = [nil] + %w(100 250_100)
 CANDIDATES_LIMIT = 5
 CANDIDATES_SELECTION = %w(min max random)
-VECTOR_DOMAIN = [nil] + %w(journal sbwce)
+VECTOR_DOMAIN = [nil] + %w(journal)
 FOLDS = 3
 
 BASE_CMD = 'python -W ignore -m thesis.classification.active_learning '
@@ -44,6 +44,8 @@ def generate_command(classifier, representation, corpus, selection, domain=nil, 
     cmd += '--folds %{folds} '
     cmd_hash[:folds] = folds
     results_hash[:folds] = folds
+  else
+    cmd += '--validation_ratio 0.2 '
   end
 
   if layers != nil
@@ -61,10 +63,6 @@ CLASSIFIERS.product(REPRESENTATIONS, CORPORA, CANDIDATES_SELECTION, VECTOR_DOMAI
 
   next if (not layers and classifier == 'mlp') or (layers and classifier != 'mlp')
   next if (representation == 'word_window' and not domain) or (representation != 'word_window' and domain)
-
-  cmd = generate_command(classifier, representation, corpus, selection, domain, nil, layers)
-  STDERR.puts cmd
-  raise 'Error on command' unless system cmd
 
   cmd = generate_command(classifier, representation, corpus, selection, domain, 3, layers)
   STDERR.puts cmd

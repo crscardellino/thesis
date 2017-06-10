@@ -25,8 +25,8 @@ def _feature_transformer(feature):
 class SemiSupervisedWrapper(object):
     def __init__(self, labeled_train_data, labeled_train_target, labeled_test_data, labeled_test_target,
                  unlabeled_data, labeled_features, unlabeled_features, min_count=2, validation_ratio=0.1,
-                 lemma='', acceptance_threshold=0.8, candidates_selection='max', candidates_limit=0, error_sigma=2,
-                 folds=0, random_seed=RANDOM_SEED):
+                 lemma='', acceptance_threshold=0.8, candidates_selection='max', candidates_limit=0, error_sigma=0.1,
+                 folds=0, random_seed=RANDOM_SEED, acceptance_alpha=0.05, error_alpha=0.05):
         filtered_values = filter_minimum(target=labeled_train_target[:], min_count=min_count)
 
         if folds > 0:
@@ -64,6 +64,7 @@ class SemiSupervisedWrapper(object):
 
         self._folds = folds
         self._acceptance_threshold = acceptance_threshold
+        self._acceptance_alpha = acceptance_alpha
         self._candidates_selection = candidates_selection
         self._candidates_limit = candidates_limit
 
@@ -230,9 +231,15 @@ class SemiSupervisedWrapper(object):
             candidates = self._get_candidates(prediction_probabilities)
 
             if len(candidates) == 0:  # Can't get more candidates
-                tqdm.write('Max predicted probability %.2f - Acceptance threshold: %.2f'
-                           % (prediction_probabilities.max(), self._acceptance_threshold), file=sys.stderr)
-                break
+                if iteration == 0:
+                    # Check there is at least 1 iteration running. If not, adapt the acceptance threshold
+                    self._acceptance_threshold -= self._acceptance_alpha
+                    continue
+                else:  # There was at least one iteration.
+                    tqdm.write('Lemma: %s - Max predicted probability %.2f - Acceptance threshold: %.2f'
+                               % (self._lemma, prediction_probabilities.max(), self._acceptance_threshold),
+                               file=sys.stderr)
+                    break
 
             data_candidates = masked_unlabeled_data[candidates]
             target_candidates = self._get_target_candidates(prediction_probabilities, candidates)
@@ -253,9 +260,14 @@ class SemiSupervisedWrapper(object):
             min_progression_error = min(self._error_progression)
 
             if self._error_sigma > 0 and validation_error > min_progression_error + self._error_sigma:
-                tqdm.write('Validation error: %.2f - Progression min error: %.2f'
-                           % (validation_error, min_progression_error), file=sys.stderr)
-                break
+                if iteration == 0:
+                    # Check there is at least 1 iteration running. If not, adapt the error_sigma
+                    self._acceptance_threshold += self._error_sigma
+                    continue
+                else:  # There was at least one iteration.
+                    tqdm.write('Validation error: %.2f - Progression min error: %.2f'
+                               % (validation_error, min_progression_error), file=sys.stderr)
+                    break
 
             if self._folds > 0:
                 self._cross_validation_results.extend(cross_validation)

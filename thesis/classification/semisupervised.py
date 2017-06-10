@@ -10,8 +10,9 @@ import sys
 from itertools import compress
 from sklearn.metrics import zero_one_loss
 from sklearn.model_selection import StratifiedKFold, KFold
-from thesis.dataset.utils import filter_minimum, validation_split
+from thesis.classification import BaselineClassifier
 from thesis.constants import RANDOM_SEED
+from thesis.dataset.utils import filter_minimum, validation_split
 from tqdm import tqdm
 
 
@@ -155,8 +156,15 @@ class SemiSupervisedWrapper(object):
                 cv_train_target = train_target[train_indices]
                 cv_test_target = train_target[test_indices]
 
-                model = model_class(**model_config)
-                model.fit(cv_train_data, cv_train_target)
+                try:
+                    model = model_class(**model_config)
+                    model.fit(cv_train_data, cv_train_target)
+                except ValueError:
+                    if np.unique(cv_train_target).shape[0] > 1:
+                        raise
+                    else:
+                        model = BaselineClassifier()
+                        model.fit(cv_train_data, cv_train_target)
 
                 cv_train_results = pd.DataFrame(
                     {'true': cv_train_target.astype(np.int32),

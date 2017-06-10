@@ -333,5 +333,6 @@ class ActiveLearningWrapper(SemiSupervisedWrapper):
         senses_description = dict(self._senses)
         senses = []
         for sense in self._train_classes:
-            senses.append((self._train_classes[sense], sense, senses_description[sense] if sense in senses_description else 'NA'))
+            senses.append((self._train_classes[sense], sense,
+                           senses_description[sense] if sense in senses_description else 'NA'))
         return pd.DataFrame(senses, columns=['id', 'sense', 'description'])

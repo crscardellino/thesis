@@ -199,6 +199,7 @@ if __name__ == '__main__':
                 if semisupervised.run(CLASSIFIERS[args.classifier], config) > 0:
                     for rst_agg, rst in zip(results, semisupervised.get_results()):
                         if rst is not None:
+                            rst.insert(0, 'error_sigma', semisupervised.error_sigma)
                             rst.insert(0, 'folds', args.folds if args.folds > 0 else 'NA')
                             rst.insert(0, 'num_classes', semisupervised.classes.shape[0])
                             rst.insert(0, 'lemma', lemma)
@@ -222,7 +223,7 @@ if __name__ == '__main__':
                         ul_instances = unlabeled_dataset.instances_id(lemma, limit=args.unlabeled_data_limit)
                         bootstrapped_instances.extend(':'.join(ul_instances[idx]) for idx in bi)
                 else:
-                    tqdm.write('The lemma %s didn\'t run iterations' % lemma, file=sys.stderr)
+                    tqdm.write('Lemma %s - No iterations' % lemma, file=sys.stderr)
         except NotEnoughSensesError:
             tqdm.write('The lemma %s doesn\'t have enough senses with at least %d occurrences'
                        % (lemma, args.min_count), file=sys.stderr)
@@ -234,7 +235,7 @@ if __name__ == '__main__':
         pd.DataFrame({'instance': bootstrapped_instances, 'predicted_target': bootstrapped_targets}) \
             .to_csv('%s_unlabeled_dataset_predictions.csv' % args.base_results_path, index=False)
     pd.concat(prediction_results, ignore_index=True) \
-        .to_csv('%s_prediction_results.csv' % args.base_results_path, index=False, float_format='%d')
+        .to_csv('%s_prediction_results.csv' % args.base_results_path, index=False, float_format='%.2f')
     pd.concat(certainty_progression, ignore_index=True) \
         .to_csv('%s_certainty_progression.csv' % args.base_results_path, index=False, float_format='%.2e')
     pd.concat(features_progression, ignore_index=True) \

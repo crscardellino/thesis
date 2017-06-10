@@ -58,6 +58,7 @@ class SemiSupervisedWrapper(object):
         self._prediction_results = []
         self._error_progression = []
         self._error_sigma = error_sigma
+        self._error_alpha = error_alpha
         self._features_progression = []
         self._certainty_progression = []
         self._cross_validation_results = []
@@ -190,6 +191,10 @@ class SemiSupervisedWrapper(object):
 
             return None, None, validation_error, new_model
 
+    @property
+    def error_sigma(self):
+        return self._error_sigma
+
     def bootstrapped(self):
         return self._bootstrapped_indices, self._bootstrapped_targets
 
@@ -234,7 +239,10 @@ class SemiSupervisedWrapper(object):
                 if iteration == 0:
                     # Check there is at least 1 iteration running. If not, adapt the acceptance threshold
                     self._acceptance_threshold -= self._acceptance_alpha
-                    continue
+                    if self._acceptance_threshold > 0.5:  # Otherwise is too low
+                        continue
+                    else:
+                        break
                 else:  # There was at least one iteration.
                     tqdm.write('Lemma: %s - Max predicted probability %.2f - Acceptance threshold: %.2f'
                                % (self._lemma, prediction_probabilities.max(), self._acceptance_threshold),
@@ -262,11 +270,14 @@ class SemiSupervisedWrapper(object):
             if self._error_sigma > 0 and validation_error > min_progression_error + self._error_sigma:
                 if iteration == 0:
                     # Check there is at least 1 iteration running. If not, adapt the error_sigma
-                    self._acceptance_threshold += self._error_sigma
-                    continue
+                    self._error_sigma += self._error_alpha
+                    if self._error_sigma < 0.5: # So the error is not so high
+                        continue
+                    else:
+                        break
                 else:  # There was at least one iteration.
-                    tqdm.write('Validation error: %.2f - Progression min error: %.2f'
-                               % (validation_error, min_progression_error), file=sys.stderr)
+                    tqdm.write('Lemma %s - Validation error: %.2f - Progression min error: %.2f'
+                               % (self._lemma, validation_error, min_progression_error), file=sys.stderr)
                     break
 
             if self._folds > 0:

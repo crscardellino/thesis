@@ -38,7 +38,6 @@ if __name__ == '__main__':
     parser.add_argument('--acceptance_threshold', type=float, default=0.8)
     parser.add_argument('--error_sigma', type=float, default=0.1)
     parser.add_argument('--random_seed', type=int, default=1234)
-    parser.add_argument('--folds', type=int, default=0)
     parser.add_argument('--corpus_name', default='NA')
     parser.add_argument('--representation', default='NA')
     parser.add_argument('--vector_domain', default='NA')
@@ -89,9 +88,9 @@ if __name__ == '__main__':
 
     print('Loading unlabeled dataset', file=sys.stderr)
     unlabeled_dataset = UnlabeledCorpusDataset(dataset_path=unlabeled_dataset_path,
-                                               features_dict_path=unlabeled_features_path
+                                               features_dict_path=unlabeled_features_path,
+                                               word_vector_model=labeled_datasets.train_dataset.word_vector_model
                                                if args.word_vector_model_path is None else None,
-                                               word_vector_model=labeled_datasets.train_dataset.word_vector_model,
                                                dataset_extra=unlabeled_dataset_extra_path)
 
     prediction_results = []
@@ -121,16 +120,19 @@ if __name__ == '__main__':
                     labeled_features=features, min_count=args.min_count, validation_ratio=args.validation_ratio,
                     acceptance_threshold=args.acceptance_threshold, random_seed=args.random_seed,
                     unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
-                    candidates_limit=args.candidates_limit, error_sigma=args.error_sigma, folds=args.folds)
+                    candidates_limit=args.candidates_limit, error_sigma=args.error_sigma, lemma=lemma)
 
-                if semisupervised.run(CLASSIFIERS[args.classifier], config) > 0:
+                iterations = semisupervised.run(CLASSIFIERS[args.classifier], config)
+
+                if iterations > 0:
                     for rst_agg, rst in zip(results, semisupervised.get_results()):
-                        if rst:
-                            rst.insert(0, 'folds', args.folds if args.folds > 0 else 'NA')
+                        if rst is not None:
+                            rst.insert(0, 'max_iterations', iterations)
+                            rst.insert(0, 'error_sigma', semisupervised.error_sigma)
+                            rst.insert(0, 'acceptance_threshold', semisupervised.acceptance_threshold)
                             rst.insert(0, 'num_classes', semisupervised.classes.shape[0])
                             rst.insert(0, 'lemma', lemma)
                             rst.insert(0, 'candidates_limit', args.candidates_limit)
-                            rst.insert(0, 'candidates_selection', args.candidates_selection)
                             rst.insert(0, 'layers', '_'.join(str(l) for l in args.layers) if args.layers else 'NA')
                             rst.insert(0, 'classifier', args.classifier)
                             rst.insert(0, 'vector_domain', args.vector_domain or 'NA')
@@ -145,9 +147,9 @@ if __name__ == '__main__':
                     ul_instances = unlabeled_dataset.instances_id(lemma, limit=args.unlabeled_data_limit)
                     bootstrapped_instances.extend(':'.join(ul_instances[idx]) for idx in bi)
                 else:
-                    tqdm.write('The lemma %s didn\'t run iterations' % lemma, file=sys.stderr)
+                    tqdm.write('Lemma %s - No iterations' % lemma, file=sys.stderr)
         except NotEnoughSensesError:
-            tqdm.write('The lemma %s doesn\'t have enough senses with at least %d occurrences'
+            tqdm.write('Lemma %s - Not enough senses with at least %d occurrences'
                        % (lemma, args.min_count), file=sys.stderr)
             continue
 

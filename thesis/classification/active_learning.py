@@ -196,9 +196,12 @@ if __name__ == '__main__':
                     acceptance_threshold=0, unlabeled_sentences=lemma_unlabeled_sentences, train_classes=train_classes
                 )
 
-                if semisupervised.run(CLASSIFIERS[args.classifier], config) > 0:
+                iterations = semisupervised.run(CLASSIFIERS[args.classifier], config)
+
+                if iterations > 0:
                     for rst_agg, rst in zip(results, semisupervised.get_results()):
                         if rst is not None:
+                            rst.insert(0, 'max_iterations', iterations)
                             rst.insert(0, 'error_sigma', semisupervised.error_sigma)
                             rst.insert(0, 'folds', args.folds if args.folds > 0 else 'NA')
                             rst.insert(0, 'num_classes', semisupervised.classes.shape[0])

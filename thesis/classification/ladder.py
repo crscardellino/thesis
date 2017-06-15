@@ -11,17 +11,24 @@ import tensorflow as tf
 
 from keras.utils.np_utils import to_categorical
 from scipy.sparse import issparse
-from sklearn.metrics import log_loss
 from thesis.dataset import SenseCorpusDatasets, UnlabeledCorpusDataset
 from thesis.dataset.utils import filter_minimum, validation_split, NotEnoughSensesError
 from thesis.constants import RANDOM_SEED
 from tqdm import tqdm, trange
 
 
+def _feature_transformer(feature):
+    if isinstance(feature[1], str):
+        return '='.join(feature), 1
+    else:
+        return feature
+
+
 class LadderNetworksExperiment(object):
     def __init__(self, labeled_train_data, labeled_train_target, labeled_test_data, labeled_test_target,
-                 unlabeled_data, layers, denoising_cost, min_count=2, validation_ratio=0.1, epochs=25,
-                 noise_std=0.3, learning_rate=0.01, evaluation_amount=100, random_seed=RANDOM_SEED):
+                 unlabeled_data, labeled_features, unlabeled_features, layers, denoising_cost, min_count=2,
+                 validation_ratio=0.2, acceptance_threshold=0.8, epochs=25, noise_std=0.3,
+                 learning_rate=0.01, random_seed=RANDOM_SEED, acceptance_alpha=0.05):
         labeled_train_data = labeled_train_data.toarray() if issparse(labeled_train_data) else labeled_train_data
         labeled_test_data = labeled_test_data.toarray() if issparse(labeled_test_data) else labeled_test_data
         unlabeled_data = unlabeled_data.toarray() if issparse(unlabeled_data) else unlabeled_data
@@ -37,9 +44,20 @@ class LadderNetworksExperiment(object):
         self._labeled_test_data = labeled_test_data
         self._labeled_test_target = labeled_test_target
         self._unlabeled_data = unlabeled_data
+        self._labeled_features = [labeled_features[idx] for idx in filtered_values[train_index]]
+        self._unlabeled_features = unlabeled_features
 
         self._classes = np.unique(self._labeled_train_target)
+        self._bootstrapped_indices = []
+        self._bootstrapped_targets = []
+
         self._prediction_results = []
+        self._features_progression = []
+        self._certainty_progression = []
+        self._classes_distribution = []
+
+        self._acceptance_threshold = acceptance_threshold
+        self._acceptance_alpha = acceptance_alpha
 
         self._input_size = self._labeled_train_data.shape[1]
         self._output_size = self._classes.shape[0]
@@ -47,14 +65,14 @@ class LadderNetworksExperiment(object):
         self._layers = layers
         self._layers.insert(0, self._input_size)
         self._layers.append(self._output_size)
-        self._L = len(self._layers) - 1  # size of layers ignoring input layer
+        self._L = len(self._layers) - 1  # amount of layers ignoring input layer
 
         self._labeled_num_examples = self._labeled_train_data.shape[0]
         self._unlabeled_num_examples = self._unlabeled_data.shape[0]
         self._num_examples = self._labeled_num_examples + self._unlabeled_num_examples
         self._num_epochs = epochs
         self._epochs_completed = 0
-        self._batch_size = self._labeled_num_examples
+        self._batch_size = self._labeled_num_examples  # Use the full labeled data to train each epoch
         self._num_iter = np.int(self._num_examples / self._batch_size) * self._num_epochs
 
         # keep track of epochs
@@ -95,12 +113,6 @@ class LadderNetworksExperiment(object):
         self._y_true = tf.argmax(self._outputs, 1)
         self._y_pred = tf.argmax(self._y, 1)
 
-        # evaluation_sentences
-        self._evaluation_amount = evaluation_amount
-        self._evaluation_sentences_indices = []
-        self._evaluation_sentences_indices_set = set()
-        self._evaluation_sentences_target = []
-
         # train_step for the weight parameters, optimized with Adam
         self._learning_rate = tf.Variable(learning_rate, trainable=False)
         self._train_step = tf.train.AdamOptimizer(self._learning_rate).minimize(self._loss)
@@ -109,29 +121,6 @@ class LadderNetworksExperiment(object):
         bn_updates = tf.group(*self._bn_assigns)
         with tf.control_dependencies([self._train_step]):
             self._train_step = tf.group(bn_updates)
-
-    @property
-    def evaluation_sentences(self):
-        return self._evaluation_sentences_indices, self._evaluation_sentences_target
-
-    def get_results(self):
-        return pd.concat(self._prediction_results, ignore_index=True)
-
-    def _add_result(self, sess, corpus_split, feed_dict, epoch):
-        y_proba, y_true, y_pred = sess.run(
-            [self._y, self._y_true, self._y_pred], feed_dict=feed_dict
-        )
-        # Calculate cross entropy error (perhaps better with the algorithm by itself)
-        # and update the results of the iteration giving the predictions
-        results = pd.DataFrame({'true': y_true.astype(np.int32),
-                                'prediction': y_pred.astype(np.int32)})
-        error = log_loss(y_true, y_proba, labels=self._classes)
-        results.insert(0, 'error', error)
-        results.insert(0, 'epoch', epoch)
-        results.insert(0, 'corpus_split', corpus_split)
-
-        # Add the results to the corresponding corpus split results
-        self._prediction_results.append(results)
 
     def _build_network(self):
         # input of the network (will be use to place the examples for training and classification)
@@ -328,6 +317,73 @@ class LadderNetworksExperiment(object):
 
         return self._unlabeled_permutation[start:end]
 
+    def _add_result(self, sess, corpus_split, iteration, feed_dict):
+        y_true, y_pred = sess.run(
+            [self._y_true, self._y_pred], feed_dict=feed_dict
+        )
+
+        # For train corpus we need to append the bootstrapped data and targets
+        if corpus_split == 'train':
+            target = np.concatenate((self._labeled_train_target, self._bootstrapped_targets))
+            # Add the features of the new data to the progression
+            unlabeled_features = [self._unlabeled_features[idx] for idx in self._bootstrapped_indices]
+            features = self._labeled_features + unlabeled_features
+
+            for tgt, feats in zip(target, features):
+                feats = [_feature_transformer(f) for f in sorted(feats.items())]
+                fdf = pd.DataFrame(feats, columns=['feature', 'count'])
+                fdf.insert(0, 'target', np.int(tgt))
+                fdf.insert(0, 'iteration', iteration)
+
+                self._features_progression.append(fdf)
+
+        # Calculate cross entropy error (perhaps better with the algorithm by itself)
+        # and update the results of the iteration giving the predictions
+        results = pd.DataFrame({'true': y_true.astype(np.int32),
+                                'prediction': y_pred.astype(np.int32)})
+        results.insert(0, 'iteration', iteration)
+        results.insert(0, 'corpus_split', corpus_split)
+
+        # Add the results to the corresponding corpus split results
+        self._prediction_results.append(results)
+
+    def _get_candidates(self, prediction_probabilities):
+        # Get the max probabilities per target
+        max_probabilities = prediction_probabilities.max(axis=1)
+
+        # Sort the candidate probabilities
+        candidates = max_probabilities.argsort()[::-1]
+
+        # If there is an acceptance threshold filter out candidates that doesn't comply it
+        if self._acceptance_threshold > 0:
+            over_threshold = np.where(max_probabilities[candidates].round(2) >= self._acceptance_threshold)[0]
+            candidates = candidates[over_threshold]
+
+        return candidates
+
+    @property
+    def acceptance_threshold(self):
+        return self._acceptance_threshold
+
+    @property
+    def classes(self):
+        return self._classes
+
+    @property
+    def epochs_completed(self):
+        return self._epochs_completed
+
+    def bootstrapped(self):
+        return self._bootstrapped_indices, self._bootstrapped_targets
+
+    def get_results(self):
+        prediction_results = pd.concat(self._prediction_results, ignore_index=True)
+        certainty_progression = pd.concat(self._certainty_progression, ignore_index=True)
+        features_progression = pd.concat(self._features_progression, ignore_index=True)
+        classes_distribution = pd.concat(self._classes_distribution, ignore_index=True)
+
+        return prediction_results, certainty_progression, features_progression, classes_distribution
+
     def run(self):
         with tf.Session() as sess:
             init = tf.global_variables_initializer()
@@ -349,7 +405,10 @@ class LadderNetworksExperiment(object):
             }
 
             for corpus_split in ('train', 'test', 'validation'):
-                self._add_result(sess, corpus_split, feed_dicts[corpus_split], 'initial')
+                self._add_result(sess, corpus_split, 'initial', feed_dicts[corpus_split])
+
+            bootstrap_mask = np.ones(self._unlabeled_data.shape[0], dtype=np.bool)
+            unlabeled_dataset_index = np.arange(self._unlabeled_data.shape[0], dtype=np.int32)
 
             for i in trange(1, self._num_iter + 1):
                 data = np.vstack((self._labeled_train_data[self._labeled_permutation],
@@ -359,26 +418,45 @@ class LadderNetworksExperiment(object):
 
                 _, error = sess.run([self._train_step, self._loss],
                                     feed_dict={self._inputs: data, self._outputs: target})
-
                 if i % (self._num_iter/self._num_epochs) == 0:
                     self._epochs_completed += 1
 
                     tqdm.write('Epoch %d - error: %f' % (self._epochs_completed, error), file=sys.stderr)
 
-                    for corpus_split in ('train', 'validation'):
-                        self._add_result(sess, corpus_split, feed_dicts[corpus_split], self._epochs_completed)
+                    # To compare against the bootstrap approach we use a similar way to select elements automatically
+                    # annotated from the unlabeled corpus that we use after to see the classes progression
+                    bootstrap_mask[self._bootstrapped_indices] = False
+                    masked_unlabeled_data = self._unlabeled_data[bootstrap_mask]
+                    prediction_probabilities = sess.run([self._y], feed_dict={self._inputs: masked_unlabeled_data})
+                    candidates = self._get_candidates(prediction_probabilities)
 
-                    # selecting some random unlabeled instances for classification and manual evaluation
-                    perm = np.array([uidx for uidx in np.random.permutation(self._unlabeled_num_examples)
-                                     if uidx not in self._evaluation_sentences_indices_set])[:self._evaluation_amount]
-                    if perm.shape[0] > 0:
-                        y_pred = sess.run(self._y_pred, feed_dict={self._inputs: self._unlabeled_data[perm]})
-                        self._evaluation_sentences_indices.extend(perm)
-                        self._evaluation_sentences_target.extend(y_pred)
-                        self._evaluation_sentences_indices_set.update(perm)
+                    while len(candidates) == 0 and self._epochs_completed < 2 and self._acceptance_threshold >= 0.4:
+                        # Check there is at least 1 iteration running. If not, adapt the acceptance threshold
+                        # Also, if the acceptance threshold is too high
+                        self._acceptance_threshold -= self._acceptance_alpha
+                        candidates = self._get_candidates(prediction_probabilities)
+
+                    target_candidates = self._classes[prediction_probabilities[candidates].argmax(axis=1)]
+                    self._bootstrapped_indices.extend(unlabeled_dataset_index[bootstrap_mask][candidates])
+                    self._bootstrapped_targets.extend(target_candidates)
+
+                    class_distribution_df = pd.DataFrame(np.concatenate((self._labeled_train_target,
+                                                                         self._bootstrapped_targets)),
+                                                         columns='target')
+                    class_distribution_df.insert(0, 'iteration', self._epochs_completed)
+                    self._classes_distribution.append(class_distribution_df)
+
+                    # Add the certainty of the predicted classes of the unseen examples
+                    # to the certainty progression results
+                    certainty_df = pd.DataFrame(prediction_probabilities.max(axis=1), columns=['certainty'])
+                    certainty_df.insert(0, 'iteration', self._epochs_completed)
+                    self._certainty_progression.append(certainty_df)
+
+                    for corpus_split in ('train', 'validation'):
+                        self._add_result(sess, corpus_split, self._epochs_completed, feed_dicts[corpus_split])
 
             for corpus_split in ('train', 'test', 'validation'):
-                self._add_result(sess, corpus_split, feed_dicts[corpus_split], 'final')
+                self._add_result(sess, corpus_split, 'final', feed_dicts[corpus_split])
 
 
 if __name__ == '__main__':
@@ -391,12 +469,15 @@ if __name__ == '__main__':
     parser.add_argument('--denoising_cost', type=float, nargs='+', default=list())
     parser.add_argument('--epochs', type=int, default=25)
     parser.add_argument('--unlabeled_data_limit', type=int, default=1000)
-    parser.add_argument('--evaluation_amount', type=int, default=100)
+    parser.add_argument('--acceptance_threshold', type=int, default=0.8)
     parser.add_argument('--min_count', type=int, default=2)
     parser.add_argument('--noise_std', type=float, default=0.3)
     parser.add_argument('--validation_ratio', type=float, default=0.1)
     parser.add_argument('--learning_rate', type=float, default=0.01)
     parser.add_argument('--random_seed', type=int, default=1234)
+    parser.add_argument('--corpus_name', default='NA')
+    parser.add_argument('--representation', default='NA')
+    parser.add_argument('--vector_domain', default='NA')
 
     args = parser.parse_args()
 
@@ -407,23 +488,33 @@ if __name__ == '__main__':
         raise ValueError('Not valid layers or denoising cost')
 
     labeled_datasets_path = os.path.join(args.labeled_dataset_path, '%s_dataset.npz')
+    labeled_features_path = os.path.join(args.labeled_dataset_path, '%s_features.p')
     unlabeled_dataset_path = os.path.join(args.unlabeled_dataset_path, 'dataset.npz')
+    unlabeled_features_path = os.path.join(args.unlabeled_dataset_path, 'features.p')
 
     print('Loading labeled dataset', file=sys.stderr)
     labeled_datasets = SenseCorpusDatasets(train_dataset_path=labeled_datasets_path % 'train',
+                                           train_features_dict_path=labeled_features_path % 'train'
+                                           if args.word_vector_model_path is None else None,
                                            test_dataset_path=labeled_datasets_path % 'test',
+                                           test_features_dict_path=labeled_features_path % 'test'
+                                           if args.word_vector_model_path is None else None,
                                            word_vector_model_path=args.word_vector_model_path)
 
     print('Loading unlabeled dataset', file=sys.stderr)
     unlabeled_dataset = UnlabeledCorpusDataset(dataset_path=unlabeled_dataset_path,
+                                               features_dict_path=unlabeled_features_path
+                                               if args.word_vector_model_path is None else None,
                                                word_vector_model=labeled_datasets.train_dataset.word_vector_model)
 
     prediction_results = []
-    evaluation_instances = []
-    evaluation_targets = []
+    certainty_progression = []
+    features_progression = []
+    classes_distribution = []
+    results = (prediction_results, certainty_progression, features_progression, classes_distribution)
 
     print('Running experiments per lemma', file=sys.stderr)
-    for lemma, data, target in \
+    for lemma, data, target, features in \
             tqdm(labeled_datasets.train_dataset.traverse_dataset_by_lemma(),
                  total=labeled_datasets.train_dataset.num_lemmas):
         if not unlabeled_dataset.has_lemma(lemma):
@@ -434,29 +525,37 @@ if __name__ == '__main__':
                 labeled_train_data=data, labeled_train_target=target,
                 labeled_test_data=labeled_datasets.test_dataset.data(lemma),
                 labeled_test_target=labeled_datasets.test_dataset.target(lemma),
-                unlabeled_data=unlabeled_dataset.data(lemma, limit=args.unlabeled_data_limit),
-                layers=args.layers[:], denoising_cost=args.denoising_cost[:], epochs=args.epochs,
+                unlabeled_data=unlabeled_dataset.data(lemma, limit=args.unlabeled_data_limit), epochs=args.epochs,
+                labeled_features=features,layers=args.layers[:], denoising_cost=args.denoising_cost[:],
+                unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
                 min_count=args.min_count, validation_ratio=args.validation_ratio, noise_std=args.noise_std,
-                learning_rate=0.01, evaluation_amount=1000, random_seed=args.random_seed)
+                learning_rate=0.01, acceptance_threshold=args.acceptance_threshold, random_seed=args.random_seed)
 
             ladder_networks.run()
 
-            pr = ladder_networks.get_results()
-            pr.insert(0, 'lemma', lemma)
-            prediction_results.append(pr)
-            # Save the bootstrapped data
-            esi, est = ladder_networks.evaluation_sentences
-            evaluation_targets.extend(est)
-
-            ul_instances = unlabeled_dataset.instances_id(lemma, limit=args.unlabeled_data_limit)
-            evaluation_instances.extend(':'.join(ul_instances[idx]) for idx in esi)
+            for rst_agg, rst in zip(results, ladder_networks.get_results()):
+                rst.insert(0, 'max_iterations', ladder_networks.epochs_completed)
+                rst.insert(0, 'acceptance_threshold', ladder_networks.acceptance_threshold)
+                rst.insert(0, 'num_classes', ladder_networks.classes.shape[0])
+                rst.insert(0, 'lemma', lemma)
+                rst.insert(0, 'denoising_cost', '_'.join(str(dc) for dc in args.denoising_cost))
+                rst.insert(0, 'layers', '_'.join(str(l) for l in args.layers))
+                rst.insert(0, 'vector_domain', args.vector_domain or 'NA')
+                rst.insert(0, 'representation', args.representation or 'NA')
+                rst.insert(0, 'corpus', args.corpus_name)
+                rst_agg.append(rst)
 
         except NotEnoughSensesError:
             tqdm.write('The lemma %s doesn\'t have enough senses with at least %d occurrences'
                        % (lemma, args.min_count), file=sys.stderr)
             continue
 
-    pd.DataFrame({'instance': evaluation_instances, 'predicted_target': evaluation_targets}) \
-        .to_csv('%s_unlabeled_dataset_predictions.csv' % args.base_results_path, index=False)
     pd.concat(prediction_results, ignore_index=True) \
-        .to_csv('%s_prediction_results.csv' % args.base_results_path, index=False, float_format='%.2e')
+        .to_csv('%s_prediction_results.csv' % args.base_results_path, index=False, float_format='%d')
+    pd.concat(certainty_progression, ignore_index=True) \
+        .to_csv('%s_certainty_progression.csv' % args.base_results_path, index=False, float_format='%.2e')
+    pd.concat(features_progression, ignore_index=True) \
+        .to_csv('%s_features_progression.csv' % args.base_results_path, index=False, float_format='%d')
+    pd.concat(classes_distribution, ignore_index=True) \
+        .to_csv('%s_classes_distribution.csv' % args.base_results_path, index=False, float_format='%d')
+

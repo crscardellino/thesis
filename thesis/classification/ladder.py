@@ -421,13 +421,11 @@ class LadderNetworksExperiment(object):
                 if i % (self._num_iter/self._num_epochs) == 0:
                     self._epochs_completed += 1
 
-                    tqdm.write('Epoch %d - error: %f' % (self._epochs_completed, error), file=sys.stderr)
-
                     # To compare against the bootstrap approach we use a similar way to select elements automatically
                     # annotated from the unlabeled corpus that we use after to see the classes progression
                     bootstrap_mask[self._bootstrapped_indices] = False
                     masked_unlabeled_data = self._unlabeled_data[bootstrap_mask]
-                    prediction_probabilities = sess.run([self._y], feed_dict={self._inputs: masked_unlabeled_data})
+                    prediction_probabilities = sess.run(self._y, feed_dict={self._inputs: masked_unlabeled_data})
                     candidates = self._get_candidates(prediction_probabilities)
 
                     while len(candidates) == 0 and self._epochs_completed < 2 and self._acceptance_threshold >= 0.4:
@@ -442,7 +440,7 @@ class LadderNetworksExperiment(object):
 
                     class_distribution_df = pd.DataFrame(np.concatenate((self._labeled_train_target,
                                                                          self._bootstrapped_targets)),
-                                                         columns='target')
+                                                         columns=['target'])
                     class_distribution_df.insert(0, 'iteration', self._epochs_completed)
                     self._classes_distribution.append(class_distribution_df)
 
@@ -475,6 +473,7 @@ if __name__ == '__main__':
     parser.add_argument('--validation_ratio', type=float, default=0.1)
     parser.add_argument('--learning_rate', type=float, default=0.01)
     parser.add_argument('--random_seed', type=int, default=1234)
+    parser.add_argument('--lemmas', nargs='+', default=set())
     parser.add_argument('--corpus_name', default='NA')
     parser.add_argument('--representation', default='NA')
     parser.add_argument('--vector_domain', default='NA')
@@ -486,6 +485,9 @@ if __name__ == '__main__':
 
     if len(args.layers) + 2 != len(args.denoising_cost) or len(args.layers) == 0:
         raise ValueError('Not valid layers or denoising cost')
+
+    if args.lemmas: 
+        args.lemmas = set(args.lemmas) if not isinstance(args.lemmas, set) else args.lemmas
 
     labeled_datasets_path = os.path.join(args.labeled_dataset_path, '%s_dataset.npz')
     labeled_features_path = os.path.join(args.labeled_dataset_path, '%s_features.p')
@@ -515,9 +517,11 @@ if __name__ == '__main__':
 
     print('Running experiments per lemma', file=sys.stderr)
     for lemma, data, target, features in \
-            tqdm(labeled_datasets.train_dataset.traverse_dataset_by_lemma(),
+            tqdm(labeled_datasets.train_dataset.traverse_dataset_by_lemma(return_features=True),
                  total=labeled_datasets.train_dataset.num_lemmas):
         if not unlabeled_dataset.has_lemma(lemma):
+            continue
+        if args.lemmas and lemma not in args.lemmas: 
             continue
         try:
             tf.reset_default_graph()

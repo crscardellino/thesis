@@ -11,6 +11,7 @@ import tensorflow as tf
 
 from keras.utils.np_utils import to_categorical
 from scipy.sparse import issparse
+from sklearn.metrics import zero_one_loss
 from thesis.dataset import SenseCorpusDatasets, UnlabeledCorpusDataset
 from thesis.dataset.utils import filter_minimum, validation_split, NotEnoughSensesError
 from thesis.constants import RANDOM_SEED
@@ -26,9 +27,9 @@ def _feature_transformer(feature):
 
 class LadderNetworksExperiment(object):
     def __init__(self, labeled_train_data, labeled_train_target, labeled_test_data, labeled_test_target,
-                 unlabeled_data, labeled_features, unlabeled_features, layers, denoising_cost, min_count=2,
-                 validation_ratio=0.2, acceptance_threshold=0.8, epochs=25, noise_std=0.3,
-                 learning_rate=0.01, random_seed=RANDOM_SEED, acceptance_alpha=0.05):
+                 unlabeled_data, labeled_features, unlabeled_features, layers, denoising_cost, min_count=2, lemma='',
+                 validation_ratio=0.2, acceptance_threshold=0.8, error_sigma=0.1, epochs=25, noise_std=0.3,
+                 learning_rate=0.01, random_seed=RANDOM_SEED, acceptance_alpha=0.05, error_alpha=0.05):
         labeled_train_data = labeled_train_data.toarray() if issparse(labeled_train_data) else labeled_train_data
         labeled_test_data = labeled_test_data.toarray() if issparse(labeled_test_data) else labeled_test_data
         unlabeled_data = unlabeled_data.toarray() if issparse(unlabeled_data) else unlabeled_data
@@ -56,8 +57,12 @@ class LadderNetworksExperiment(object):
         self._certainty_progression = []
         self._classes_distribution = []
 
+        self._lemma = lemma
         self._acceptance_threshold = acceptance_threshold
         self._acceptance_alpha = acceptance_alpha
+        self._error_sigma = error_sigma
+        self._error_alpha = error_alpha
+        self._error_progression = []
 
         self._input_size = self._labeled_train_data.shape[1]
         self._output_size = self._classes.shape[0]
@@ -336,6 +341,10 @@ class LadderNetworksExperiment(object):
                 fdf.insert(0, 'iteration', iteration)
 
                 self._features_progression.append(fdf)
+        elif corpus_split == 'validation':
+            self._error_progression.append(
+                zero_one_loss(self._labeled_validation_target, y_pred)
+            )
 
         # Calculate cross entropy error (perhaps better with the algorithm by itself)
         # and update the results of the iteration giving the predictions
@@ -373,6 +382,10 @@ class LadderNetworksExperiment(object):
     @property
     def epochs_completed(self):
         return self._epochs_completed
+
+    @property
+    def error_sigma(self):
+        return self._error_sigma
 
     def bootstrapped(self):
         return self._bootstrapped_indices, self._bootstrapped_targets
@@ -454,6 +467,19 @@ class LadderNetworksExperiment(object):
                     for corpus_split in ('train', 'validation'):
                         self._add_result(sess, corpus_split, self._epochs_completed, feed_dicts[corpus_split])
 
+                    min_progression_error = min(self._error_progression[:-1])
+
+                    while 0. < self._error_sigma <= 0.25 and self._epochs_completed < 2 and \
+                            self._error_progression[-1] > min_progression_error + self._error_sigma:
+                        self._error_sigma += self._error_alpha
+
+                    if self._error_sigma > 0 and \
+                            self._error_progression[-1] > min_progression_error + self._error_sigma:
+                        tqdm.write('Lemma %s - Validation error: %.2f - Progression min error: %.2f - Iterations: %d'
+                                   % (self._lemma, self._error_progression[-1], min_progression_error,
+                                      self._epochs_completed), file=sys.stderr)
+                        break
+
             for corpus_split in ('train', 'test', 'validation'):
                 self._add_result(sess, corpus_split, 'final', feed_dicts[corpus_split])
 
@@ -469,6 +495,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=25)
     parser.add_argument('--unlabeled_data_limit', type=int, default=1000)
     parser.add_argument('--acceptance_threshold', type=int, default=0.8)
+    parser.add_argument('--error_sigma', type=float, default=0.1)
     parser.add_argument('--min_count', type=int, default=2)
     parser.add_argument('--noise_std', type=float, default=0.3)
     parser.add_argument('--validation_ratio', type=float, default=0.1)
@@ -534,12 +561,14 @@ if __name__ == '__main__':
                 labeled_features=features,layers=args.layers[:], denoising_cost=args.denoising_cost[:],
                 unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
                 min_count=args.min_count, validation_ratio=args.validation_ratio, noise_std=args.noise_std,
-                learning_rate=0.01, acceptance_threshold=args.acceptance_threshold, random_seed=args.random_seed)
+                learning_rate=0.01, acceptance_threshold=args.acceptance_threshold, error_sigma=args.error_sigma,
+                lemma=lemma, random_seed=args.random_seed)
 
             ladder_networks.run()
 
             for rst_agg, rst in zip(results, ladder_networks.get_results()):
                 rst.insert(0, 'max_iterations', ladder_networks.epochs_completed)
+                rst.insert(0, 'error_sigma', ladder_networks.error_sigma)
                 rst.insert(0, 'acceptance_threshold', ladder_networks.acceptance_threshold)
                 rst.insert(0, 'num_classes', ladder_networks.classes.shape[0])
                 rst.insert(0, 'lemma', lemma)

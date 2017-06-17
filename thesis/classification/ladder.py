@@ -12,6 +12,7 @@ import tensorflow as tf
 from keras.utils.np_utils import to_categorical
 from scipy.sparse import issparse
 from sklearn.metrics import zero_one_loss
+from sklearn.preprocessing import normalize
 from thesis.dataset import SenseCorpusDatasets, UnlabeledCorpusDataset
 from thesis.dataset.utils import filter_minimum, validation_split, NotEnoughSensesError
 from thesis.constants import RANDOM_SEED
@@ -29,10 +30,19 @@ class LadderNetworksExperiment(object):
     def __init__(self, labeled_train_data, labeled_train_target, labeled_test_data, labeled_test_target,
                  unlabeled_data, labeled_features, unlabeled_features, layers, denoising_cost, min_count=2, lemma='',
                  validation_ratio=0.2, acceptance_threshold=0.8, error_sigma=0.1, epochs=25, noise_std=0.3,
-                 learning_rate=0.01, random_seed=RANDOM_SEED, acceptance_alpha=0.05, error_alpha=0.05):
+                 learning_rate=0.01, random_seed=RANDOM_SEED, acceptance_alpha=0.05, error_alpha=0.05,
+                 normalize_data=False):
         labeled_train_data = labeled_train_data.toarray() if issparse(labeled_train_data) else labeled_train_data
         labeled_test_data = labeled_test_data.toarray() if issparse(labeled_test_data) else labeled_test_data
         unlabeled_data = unlabeled_data.toarray() if issparse(unlabeled_data) else unlabeled_data
+
+        if normalize_data:
+            trd = labeled_train_data.shape[0]
+            tsd = labeled_test_data.shape[0]
+            normalized_data = normalize(np.vstack((labeled_train_data, labeled_test_data, unlabeled_data)), axis=0)
+            labeled_train_data = normalized_data[:trd, :]
+            labeled_test_data = normalized_data[trd:trd+tsd, :]
+            unlabeled_data = normalized_data[trd+tsd:, :]
 
         filtered_values = filter_minimum(target=labeled_train_target, min_count=min_count)
         train_index, validation_index = validation_split(target=labeled_train_target[filtered_values],
@@ -556,11 +566,11 @@ if __name__ == '__main__':
                 labeled_test_data=labeled_datasets.test_dataset.data(lemma),
                 labeled_test_target=labeled_datasets.test_dataset.target(lemma),
                 unlabeled_data=unlabeled_dataset.data(lemma, limit=args.unlabeled_data_limit), epochs=args.epochs,
-                labeled_features=features,layers=args.layers[:], denoising_cost=args.denoising_cost[:],
+                labeled_features=features, layers=args.layers[:], denoising_cost=args.denoising_cost[:],
                 unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
                 min_count=args.min_count, validation_ratio=args.validation_ratio, noise_std=args.noise_std,
                 learning_rate=0.01, acceptance_threshold=args.acceptance_threshold, error_sigma=args.error_sigma,
-                lemma=lemma, random_seed=args.random_seed)
+                lemma=lemma, random_seed=args.random_seed, normalize_data=args.word_vector_model_path is None)
 
             ladder_networks.run()
 
@@ -572,6 +582,7 @@ if __name__ == '__main__':
                 rst.insert(0, 'lemma', lemma)
                 rst.insert(0, 'denoising_cost', '_'.join(str(dc) for dc in args.denoising_cost))
                 rst.insert(0, 'layers', '_'.join(str(l) for l in args.layers))
+                rst.insert(0, 'classifier', 'ladder')
                 rst.insert(0, 'vector_domain', args.vector_domain or 'NA')
                 rst.insert(0, 'representation', args.representation or 'NA')
                 rst.insert(0, 'corpus', args.corpus_name)

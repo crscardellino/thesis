@@ -70,6 +70,6 @@ REPRESENTATIONS.product(CORPORA, VECTOR_DOMAIN, LAYERS, EPOCHS, NOISE).each do
 
   cmd = generate_command(representation, corpus, LANGUAGE[corpus.to_sym], layers, epochs, noise, domain)
   STDERR.puts cmd
-  #raise 'Error on command' unless system cmd
+  raise 'Error on command' unless system cmd
 end
 

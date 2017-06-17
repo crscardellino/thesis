@@ -341,7 +341,8 @@ class LadderNetworksExperiment(object):
                 fdf.insert(0, 'iteration', iteration)
 
                 self._features_progression.append(fdf)
-        elif corpus_split == 'validation':
+        elif corpus_split == 'validation' and iteration != 'initial':
+            # Do not record the initial error
             self._error_progression.append(
                 zero_one_loss(self._labeled_validation_target, y_pred)
             )
@@ -467,18 +468,15 @@ class LadderNetworksExperiment(object):
                     for corpus_split in ('train', 'validation'):
                         self._add_result(sess, corpus_split, self._epochs_completed, feed_dicts[corpus_split])
 
-                    min_progression_error = min(self._error_progression[:-1])
+                    if self._epochs_completed > 1:
+                        min_progression_error = min(self._error_progression[:-1])
 
-                    while 0. < self._error_sigma <= 0.25 and self._epochs_completed < 2 and \
-                            self._error_progression[-1] > min_progression_error + self._error_sigma:
-                        self._error_sigma += self._error_alpha
-
-                    if self._error_sigma > 0 and \
-                            self._error_progression[-1] > min_progression_error + self._error_sigma:
-                        tqdm.write('Lemma %s - Validation error: %.2f - Progression min error: %.2f - Iterations: %d'
-                                   % (self._lemma, self._error_progression[-1], min_progression_error,
-                                      self._epochs_completed), file=sys.stderr)
-                        break
+                        if self._error_sigma > 0 and \
+                                self._error_progression[-1] > min_progression_error + self._error_sigma:
+                            tqdm.write('Lemma %s - Validation error: %.2f - Progression min error: %.2f - Iterations: %d'
+                                       % (self._lemma, self._error_progression[-1], min_progression_error,
+                                          self._epochs_completed), file=sys.stderr)
+                            break
 
             for corpus_split in ('train', 'test', 'validation'):
                 self._add_result(sess, corpus_split, 'final', feed_dicts[corpus_split])

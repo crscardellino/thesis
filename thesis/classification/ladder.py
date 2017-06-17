@@ -359,7 +359,8 @@ class LadderNetworksExperiment(object):
         # Calculate cross entropy error (perhaps better with the algorithm by itself)
         # and update the results of the iteration giving the predictions
         results = pd.DataFrame({'true': y_true.astype(np.int32),
-                                'prediction': y_pred.astype(np.int32)})
+                                'prediction': y_pred.astype(np.int32)},
+                               columns=['true', 'prediction'])
         results.insert(0, 'iteration', iteration)
         results.insert(0, 'corpus_split', corpus_split)
 

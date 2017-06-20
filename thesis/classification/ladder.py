@@ -502,7 +502,7 @@ if __name__ == '__main__':
     parser.add_argument('--denoising_cost', type=float, nargs='+', default=list())
     parser.add_argument('--epochs', type=int, default=25)
     parser.add_argument('--unlabeled_data_limit', type=int, default=1000)
-    parser.add_argument('--acceptance_threshold', type=int, default=0.8)
+    parser.add_argument('--acceptance_threshold', type=float, default=0.8)
     parser.add_argument('--error_sigma', type=float, default=0.1)
     parser.add_argument('--min_count', type=int, default=2)
     parser.add_argument('--noise_std', type=float, default=0.3)

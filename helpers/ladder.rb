@@ -4,9 +4,9 @@ Dir.chdir '..'
 
 REPRESENTATIONS = %w(hashed word_window)
 CORPORA = %w(sensem)
-LAYERS = %w(100 250_100 100_100_100 250_100_100 250_250_100 500_250_100 500_250_250_100)
-EPOCHS = %w(25 50)
-NOISE = %w(0.2 0.3 0.5)
+LAYERS = %w(100 250_100 100_100_100 250_250_100 500_250_250_100)
+EPOCHS = %w(25)
+NOISE = %w(0.2 0.3)
 VECTOR_DOMAIN = [nil] + %w(journal)
 ACCEPTANCE_THRESHOLD = 0.9
 VALIDATION_RATIO = 0.2
@@ -54,8 +54,8 @@ def generate_command(representation, corpus, language, layers, epochs, noise, do
     results_hash[:layers] = layers
 
     cmd += '--denoising_cost %{dc}'
-    dc = []
-    layers.split('_').each_with_index { |l, i| dc.push(if i == 0 then 1000.0 elsif i == 1 then 10.0 else 0.10 end) }
+    dc = [1000.0, 10.0]
+    layers.split('_').each { |l| dc.push(0.10) }
     cmd_hash[:dc] = dc.join(' ')
   end
 
@@ -70,6 +70,6 @@ REPRESENTATIONS.product(CORPORA, VECTOR_DOMAIN, LAYERS, EPOCHS, NOISE).each do
 
   cmd = generate_command(representation, corpus, LANGUAGE[corpus.to_sym], layers, epochs, noise, domain)
   STDERR.puts cmd
-  raise 'Error on command' unless system cmd
+  #raise 'Error on command' unless system cmd
 end
 

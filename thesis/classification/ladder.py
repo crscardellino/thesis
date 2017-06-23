@@ -31,7 +31,7 @@ class LadderNetworksExperiment(object):
                  unlabeled_data, labeled_features, unlabeled_features, layers, denoising_cost, min_count=2, lemma='',
                  validation_ratio=0.2, acceptance_threshold=0.8, error_sigma=0.1, epochs=25, noise_std=0.3,
                  learning_rate=0.01, random_seed=RANDOM_SEED, acceptance_alpha=0.05, error_alpha=0.05,
-                 normalize_data=False):
+                 normalize_data=False, max_error=0.15):
         labeled_train_data = labeled_train_data.toarray() if issparse(labeled_train_data) else labeled_train_data
         labeled_test_data = labeled_test_data.toarray() if issparse(labeled_test_data) else labeled_test_data
         unlabeled_data = unlabeled_data.toarray() if issparse(unlabeled_data) else unlabeled_data
@@ -70,6 +70,7 @@ class LadderNetworksExperiment(object):
         self._lemma = lemma
         self._acceptance_threshold = acceptance_threshold
         self._acceptance_alpha = acceptance_alpha
+        self._max_error = max_error
         self._error_sigma = error_sigma
         self._error_alpha = error_alpha
         self._error_progression = []
@@ -446,28 +447,9 @@ class LadderNetworksExperiment(object):
                 if i % (self._num_iter/self._num_epochs) == 0:
                     self._epochs_completed += 1
 
-                    # To compare against the bootstrap approach we use a similar way to select elements automatically
-                    # annotated from the unlabeled corpus that we use after to see the classes progression
                     bootstrap_mask[self._bootstrapped_indices] = False
                     masked_unlabeled_data = self._unlabeled_data[bootstrap_mask]
                     prediction_probabilities = sess.run(self._y, feed_dict={self._inputs: masked_unlabeled_data})
-                    candidates = self._get_candidates(prediction_probabilities)
-
-                    while len(candidates) == 0 and self._epochs_completed < 2 and self._acceptance_threshold >= 0.4:
-                        # Check there is at least 1 iteration running. If not, adapt the acceptance threshold
-                        # Also, if the acceptance threshold is too high
-                        self._acceptance_threshold -= self._acceptance_alpha
-                        candidates = self._get_candidates(prediction_probabilities)
-
-                    target_candidates = self._classes[prediction_probabilities[candidates].argmax(axis=1)]
-                    self._bootstrapped_indices.extend(unlabeled_dataset_index[bootstrap_mask][candidates])
-                    self._bootstrapped_targets.extend(target_candidates)
-
-                    class_distribution_df = pd.DataFrame(np.concatenate((self._labeled_train_target,
-                                                                         self._bootstrapped_targets)),
-                                                         columns=['target'])
-                    class_distribution_df.insert(0, 'iteration', self._epochs_completed)
-                    self._classes_distribution.append(class_distribution_df)
 
                     # Add the certainty of the predicted classes of the unseen examples
                     # to the certainty progression results
@@ -478,14 +460,41 @@ class LadderNetworksExperiment(object):
                     for corpus_split in ('train', 'validation'):
                         self._add_result(sess, corpus_split, self._epochs_completed, feed_dicts[corpus_split])
 
+                    if len(self._error_progression) > 0 and self._error_progression[-1] <= self._max_error:
+                        # To compare against the bootstrap approach we use a similar way to select elements
+                        # automatically annotated from the unlabeled corpus that we use after to see
+                        # the classes progression
+                        candidates = self._get_candidates(prediction_probabilities)
+
+                        while len(candidates) == 0 and self._acceptance_threshold >= 0.5:
+                            # Check there is at least 1 iteration running. If not, adapt the acceptance threshold
+                            # Also, if the acceptance threshold is too high
+                            self._acceptance_threshold -= self._acceptance_alpha
+                            candidates = self._get_candidates(prediction_probabilities)
+
+                        target_candidates = self._classes[prediction_probabilities[candidates].argmax(axis=1)]
+                        self._bootstrapped_indices.extend(unlabeled_dataset_index[bootstrap_mask][candidates])
+                        self._bootstrapped_targets.extend(target_candidates)
+
+                        class_distribution_df = pd.DataFrame(np.concatenate((self._labeled_train_target,
+                                                                             self._bootstrapped_targets)),
+                                                             columns=['target'])
+                        class_distribution_df.insert(0, 'iteration', self._epochs_completed)
+                        self._classes_distribution.append(class_distribution_df)
+                    elif len(self._error_progression) > 0:
+                        tqdm.write('Epoch %d - Max error is not enough %.2f'
+                                   % (self._epochs_completed, self._error_progression[-1]), file=sys.stderr)
+
                     if self._epochs_completed > 1:
                         min_progression_error = min(self._error_progression[:-1])
 
                         if self._error_sigma > 0 and \
                                 self._error_progression[-1] > min_progression_error + self._error_sigma:
-                            tqdm.write('Lemma %s - Validation error: %.2f - Progression min error: %.2f - Iterations: %d'
-                                       % (self._lemma, self._error_progression[-1], min_progression_error,
-                                          self._epochs_completed), file=sys.stderr)
+                            tqdm.write(
+                                'Lemma %s - Validation error: %.2f - Progression min error: %.2f - Iterations: %d'
+                                % (self._lemma, self._error_progression[-1], min_progression_error,
+                                   self._epochs_completed), file=sys.stderr
+                            )
                             break
 
             for corpus_split in ('train', 'test', 'validation'):
@@ -503,6 +512,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=25)
     parser.add_argument('--unlabeled_data_limit', type=int, default=1000)
     parser.add_argument('--acceptance_threshold', type=float, default=0.8)
+    parser.add_argument('--max_error', type=float, default=0.15)
     parser.add_argument('--error_sigma', type=float, default=0.1)
     parser.add_argument('--min_count', type=int, default=2)
     parser.add_argument('--noise_std', type=float, default=0.3)
@@ -570,7 +580,9 @@ if __name__ == '__main__':
                 unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
                 min_count=args.min_count, validation_ratio=args.validation_ratio, noise_std=args.noise_std,
                 learning_rate=0.01, acceptance_threshold=args.acceptance_threshold, error_sigma=args.error_sigma,
-                lemma=lemma, random_seed=args.random_seed, normalize_data=args.word_vector_model_path is None)
+                lemma=lemma, random_seed=args.random_seed, normalize_data=args.word_vector_model_path is None,
+                max_error=args.max_error
+            )
 
             ladder_networks.run()
 

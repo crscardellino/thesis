@@ -37,6 +37,7 @@ if __name__ == '__main__':
     parser.add_argument('--validation_ratio', type=float, default=0.2)
     parser.add_argument('--acceptance_threshold', type=float, default=0.8)
     parser.add_argument('--error_sigma', type=float, default=0.1)
+    parser.add_argument('--lemmas', nargs='+', default=set())
     parser.add_argument('--random_seed', type=int, default=1234)
     parser.add_argument('--corpus_name', default='NA')
     parser.add_argument('--representation', default='NA')
@@ -49,6 +50,9 @@ if __name__ == '__main__':
             config = json.load(fconfig)
     else:
         config = {}
+
+    if args.lemmas:
+        args.lemmas = set(args.lemmas) if not isinstance(args.lemmas, set) else args.lemmas
 
     args.classifier_config = [args.classifier_config] \
         if isinstance(args.classifier_config, tuple) else args.classifier_config
@@ -106,6 +110,8 @@ if __name__ == '__main__':
             tqdm(labeled_datasets.train_dataset.traverse_dataset_by_lemma(return_features=True),
                  total=labeled_datasets.train_dataset.num_lemmas):
         if not unlabeled_dataset.has_lemma(lemma):
+            continue
+        if args.lemmas and lemma not in args.lemmas:
             continue
         try:
             tf.reset_default_graph()

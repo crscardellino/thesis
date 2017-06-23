@@ -9,9 +9,10 @@ import pandas as pd
 import sys
 import tensorflow as tf
 
+from imblearn.over_sampling import RandomOverSampler
 from keras.utils.np_utils import to_categorical
 from scipy.sparse import issparse
-from sklearn.metrics import zero_one_loss
+from sklearn.metrics import zero_one_loss, accuracy_score
 from sklearn.preprocessing import normalize
 from thesis.dataset import SenseCorpusDatasets, UnlabeledCorpusDataset
 from thesis.dataset.utils import filter_minimum, validation_split, NotEnoughSensesError
@@ -31,7 +32,7 @@ class LadderNetworksExperiment(object):
                  unlabeled_data, labeled_features, unlabeled_features, layers, denoising_cost, min_count=2, lemma='',
                  validation_ratio=0.2, acceptance_threshold=0.8, error_sigma=0.1, epochs=25, noise_std=0.3,
                  learning_rate=0.01, random_seed=RANDOM_SEED, acceptance_alpha=0.05, error_alpha=0.05,
-                 normalize_data=False, max_error=0.15):
+                 normalize_data=False, max_error=0.15, decay_after=15):
         labeled_train_data = labeled_train_data.toarray() if issparse(labeled_train_data) else labeled_train_data
         labeled_test_data = labeled_test_data.toarray() if issparse(labeled_test_data) else labeled_test_data
         unlabeled_data = unlabeled_data.toarray() if issparse(unlabeled_data) else unlabeled_data
@@ -50,6 +51,11 @@ class LadderNetworksExperiment(object):
 
         self._labeled_train_data = labeled_train_data[filtered_values][train_index]
         self._labeled_train_target = labeled_train_target[filtered_values][train_index]
+
+        # OverSampling
+        ros = RandomOverSampler()
+        self._labeled_train_data, self._labeled_train_target = ros.fit_sample(self._labeled_train_data, self._labeled_train_target)
+
         self._labeled_validation_data = labeled_train_data[filtered_values][validation_index]
         self._labeled_validation_target = labeled_train_target[filtered_values][validation_index]
         self._labeled_test_data = labeled_test_data
@@ -71,6 +77,7 @@ class LadderNetworksExperiment(object):
         self._acceptance_threshold = acceptance_threshold
         self._acceptance_alpha = acceptance_alpha
         self._max_error = max_error
+        self._decay_after = decay_after
         self._error_sigma = error_sigma
         self._error_alpha = error_alpha
         self._error_progression = []
@@ -130,7 +137,8 @@ class LadderNetworksExperiment(object):
         self._y_pred = tf.argmax(self._y, 1)
 
         # train_step for the weight parameters, optimized with Adam
-        self._learning_rate = tf.Variable(learning_rate, trainable=False)
+        self._starter_learning_rate = learning_rate
+        self._learning_rate = tf.Variable(self._starter_learning_rate, trainable=False)
         self._train_step = tf.train.AdamOptimizer(self._learning_rate).minimize(self._loss)
 
         # add the updates of batch normalization statistics to train_step
@@ -355,8 +363,11 @@ class LadderNetworksExperiment(object):
         elif corpus_split == 'validation' and iteration != 'initial':
             # Do not record the initial error
             self._error_progression.append(
-                zero_one_loss(self._labeled_validation_target, y_pred)
+                zero_one_loss(y_true, y_pred)
             )
+        elif corpus_split == 'test' and iteration == 'final':
+            tqdm.write('Test error: %.2f' % zero_one_loss(y_true, y_pred), file=sys.stderr, end='\n\n')
+            tqdm.write('Test accuracy: %.2f' % accuracy_score(y_true, y_pred), file=sys.stderr, end='\n\n')
 
         # Calculate cross entropy error (perhaps better with the algorithm by itself)
         # and update the results of the iteration giving the predictions
@@ -447,6 +458,13 @@ class LadderNetworksExperiment(object):
                 if i % (self._num_iter/self._num_epochs) == 0:
                     self._epochs_completed += 1
 
+                    if self._epochs_completed >= self._decay_after:
+                        # decay learning rate
+                        # learning_rate = starter_learning_rate * ((num_epochs - epoch_n) / (num_epochs - decay_after))
+                        ratio = 1.0 * (self._num_epochs - (self._epochs_completed + 1))  # epoch_n + 1 because learning rate is set for next epoch
+                        ratio = max(0, ratio / (self._num_epochs - self._decay_after))
+                        sess.run(self._learning_rate.assign(self._starter_learning_rate * ratio))
+
                     bootstrap_mask[self._bootstrapped_indices] = False
                     masked_unlabeled_data = self._unlabeled_data[bootstrap_mask]
                     prediction_probabilities = sess.run(self._y, feed_dict={self._inputs: masked_unlabeled_data})
@@ -460,13 +478,16 @@ class LadderNetworksExperiment(object):
                     for corpus_split in ('train', 'validation'):
                         self._add_result(sess, corpus_split, self._epochs_completed, feed_dicts[corpus_split])
 
+                    tqdm.write('Epoch %d - Last error %.2f - Train error %.2f'
+                               % (self._epochs_completed, self._error_progression[-1], error), file=sys.stderr)
+
                     if len(self._error_progression) > 0 and self._error_progression[-1] <= self._max_error:
                         # To compare against the bootstrap approach we use a similar way to select elements
                         # automatically annotated from the unlabeled corpus that we use after to see
                         # the classes progression
                         candidates = self._get_candidates(prediction_probabilities)
 
-                        while len(candidates) == 0 and self._acceptance_threshold >= 0.5:
+                        while len(candidates) == 0 and self._acceptance_threshold > 0.5:
                             # Check there is at least 1 iteration running. If not, adapt the acceptance threshold
                             # Also, if the acceptance threshold is too high
                             self._acceptance_threshold -= self._acceptance_alpha
@@ -481,9 +502,6 @@ class LadderNetworksExperiment(object):
                                                              columns=['target'])
                         class_distribution_df.insert(0, 'iteration', self._epochs_completed)
                         self._classes_distribution.append(class_distribution_df)
-                    elif len(self._error_progression) > 0:
-                        tqdm.write('Epoch %d - Max error is not enough %.2f'
-                                   % (self._epochs_completed, self._error_progression[-1]), file=sys.stderr)
 
                     if self._epochs_completed > 1:
                         min_progression_error = min(self._error_progression[:-1])

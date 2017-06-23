@@ -7,6 +7,7 @@ import pandas as pd
 import scipy.sparse as sps
 import sys
 
+from imblearn.over_sampling import RandomOverSampler
 from itertools import compress
 from sklearn.metrics import zero_one_loss
 from sklearn.model_selection import StratifiedKFold, KFold
@@ -44,6 +45,10 @@ class SemiSupervisedWrapper(object):
             self._labeled_validation_data = labeled_train_data[filtered_values][validation_index]
             self._labeled_validation_target = labeled_train_target[filtered_values][validation_index]
             self._labeled_features = [labeled_features[idx] for idx in filtered_values[train_index]]
+
+        # OverSampling
+        ros = RandomOverSampler()
+        self._labeled_train_data, self._labeled_train_target = ros.fit_sample(self._labeled_train_data, self._labeled_train_target)
 
         self._labeled_test_data = labeled_test_data
         self._labeled_test_target = labeled_test_target

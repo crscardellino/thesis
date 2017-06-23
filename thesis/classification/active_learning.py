@@ -238,16 +238,16 @@ if __name__ == '__main__':
         pd.DataFrame({'instance': bootstrapped_instances, 'predicted_target': bootstrapped_targets}) \
             .to_csv('%s_unlabeled_dataset_predictions.csv' % args.base_results_path, index=False)
     pd.concat(prediction_results, ignore_index=True) \
-        .to_csv('%s_prediction_results.csv' % args.base_results_path, index=False, float_format='%.2f')
+        .to_csv('%s_prediction_results.csv' % args.base_results_path, index=False, float_format='%.2e')
     pd.concat(certainty_progression, ignore_index=True) \
         .to_csv('%s_certainty_progression.csv' % args.base_results_path, index=False, float_format='%.2e')
     pd.concat(features_progression, ignore_index=True) \
-        .to_csv('%s_features_progression.csv' % args.base_results_path, index=False, float_format='%d')
+        .to_csv('%s_features_progression.csv' % args.base_results_path, index=False, float_format='%.2e')
 
     if senses:
         pd.concat(senses, ignore_index=True).\
-            to_csv('%s_senses_description.csv' % args.base_results_path, index=False, float='%d')
+            to_csv('%s_senses_description.csv' % args.base_results_path, index=False, float='%.2e')
 
     if cross_validation_results:
         pd.concat(cross_validation_results, ignore_index=True) \
-            .to_csv('%s_cross_validation_results.csv' % args.base_results_path, index=False, float_format='%d')
+            .to_csv('%s_cross_validation_results.csv' % args.base_results_path, index=False, float_format='%.2e')

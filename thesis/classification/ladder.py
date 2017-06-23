@@ -595,11 +595,11 @@ if __name__ == '__main__':
             continue
 
     pd.concat(prediction_results, ignore_index=True) \
-        .to_csv('%s_prediction_results.csv' % args.base_results_path, index=False, float_format='%d')
+        .to_csv('%s_prediction_results.csv' % args.base_results_path, index=False, float_format='%.2e')
     pd.concat(certainty_progression, ignore_index=True) \
         .to_csv('%s_certainty_progression.csv' % args.base_results_path, index=False, float_format='%.2e')
     pd.concat(features_progression, ignore_index=True) \
-        .to_csv('%s_features_progression.csv' % args.base_results_path, index=False, float_format='%d')
+        .to_csv('%s_features_progression.csv' % args.base_results_path, index=False, float_format='%.2e')
     pd.concat(classes_distribution, ignore_index=True) \
-        .to_csv('%s_classes_distribution.csv' % args.base_results_path, index=False, float_format='%d')
+        .to_csv('%s_classes_distribution.csv' % args.base_results_path, index=False, float_format='%.2e')
 

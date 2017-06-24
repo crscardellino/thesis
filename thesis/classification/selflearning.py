@@ -126,7 +126,8 @@ if __name__ == '__main__':
                     labeled_features=features, min_count=args.min_count, validation_ratio=args.validation_ratio,
                     acceptance_threshold=args.acceptance_threshold, random_seed=args.random_seed,
                     unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
-                    candidates_limit=args.candidates_limit, error_sigma=args.error_sigma, lemma=lemma)
+                    candidates_limit=args.candidates_limit, error_sigma=args.error_sigma, lemma=lemma,
+                    oversampling=True)
 
                 iterations = semisupervised.run(CLASSIFIERS[args.classifier], config)
 
@@ -161,15 +162,33 @@ if __name__ == '__main__':
 
     print('Saving results', file=sys.stderr)
 
-    pd.DataFrame({'instance': bootstrapped_instances, 'predicted_target': bootstrapped_targets}) \
-        .to_csv('%s_unlabeled_dataset_predictions.csv' % args.base_results_path, index=False)
-    pd.concat(prediction_results, ignore_index=True) \
-        .to_csv('%s_prediction_results.csv' % args.base_results_path, index=False, float_format='%.2e')
-    pd.concat(certainty_progression, ignore_index=True) \
-        .to_csv('%s_certainty_progression.csv' % args.base_results_path, index=False, float_format='%.2e')
-    pd.concat(features_progression, ignore_index=True) \
-        .to_csv('%s_features_progression.csv' % args.base_results_path, index=False, float_format='%.2e')
+    try:
+        pd.DataFrame({'instance': bootstrapped_instances, 'predicted_target': bootstrapped_targets}) \
+            .to_csv('%s_unlabeled_dataset_predictions.csv' % args.base_results_path, index=False)
+    except (ValueError, MemoryError) as e:
+        print(e.args, file=sys.stderr)
 
-    if cross_validation_results:
+    try:
+        pd.concat(prediction_results, ignore_index=True) \
+            .to_csv('%s_prediction_results.csv' % args.base_results_path, index=False, float_format='%.2e')
+    except (ValueError, MemoryError) as e:
+        print(e.args, file=sys.stderr)
+
+    try:
+        pd.concat(certainty_progression, ignore_index=True) \
+            .to_csv('%s_certainty_progression.csv' % args.base_results_path, index=False, float_format='%.2e')
+    except (ValueError, MemoryError) as e:
+        print(e.args, file=sys.stderr)
+
+    try:
+        pd.concat(features_progression, ignore_index=True) \
+            .to_csv('%s_features_progression.csv' % args.base_results_path, index=False, float_format='%.2e')
+    except (ValueError, MemoryError) as e:
+        print(e.args, file=sys.stderr)
+
+    try:
         pd.concat(cross_validation_results, ignore_index=True) \
             .to_csv('%s_cross_validation_results.csv' % args.base_results_path, index=False, float_format='%.2e')
+    except (ValueError, MemoryError) as e:
+        print(e.args, file=sys.stderr)
+

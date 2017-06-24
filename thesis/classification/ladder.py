@@ -12,7 +12,7 @@ import tensorflow as tf
 from imblearn.over_sampling import RandomOverSampler
 from keras.utils.np_utils import to_categorical
 from scipy.sparse import issparse
-from sklearn.metrics import zero_one_loss, accuracy_score
+from sklearn.metrics import zero_one_loss
 from sklearn.preprocessing import normalize
 from thesis.dataset import SenseCorpusDatasets, UnlabeledCorpusDataset
 from thesis.dataset.utils import filter_minimum, validation_split, NotEnoughSensesError
@@ -32,7 +32,7 @@ class LadderNetworksExperiment(object):
                  unlabeled_data, labeled_features, unlabeled_features, layers, denoising_cost, min_count=2, lemma='',
                  validation_ratio=0.2, acceptance_threshold=0.8, error_sigma=0.1, epochs=25, noise_std=0.3,
                  learning_rate=0.01, random_seed=RANDOM_SEED, acceptance_alpha=0.05, error_alpha=0.05,
-                 normalize_data=False, max_error=0.15, decay_after=15):
+                 normalize_data=False, max_error=0.15, decay_after=15, oversampling=False):
         labeled_train_data = labeled_train_data.toarray() if issparse(labeled_train_data) else labeled_train_data
         labeled_test_data = labeled_test_data.toarray() if issparse(labeled_test_data) else labeled_test_data
         unlabeled_data = unlabeled_data.toarray() if issparse(unlabeled_data) else unlabeled_data
@@ -52,9 +52,11 @@ class LadderNetworksExperiment(object):
         self._labeled_train_data = labeled_train_data[filtered_values][train_index]
         self._labeled_train_target = labeled_train_target[filtered_values][train_index]
 
-        # OverSampling
-        ros = RandomOverSampler()
-        self._labeled_train_data, self._labeled_train_target = ros.fit_sample(self._labeled_train_data, self._labeled_train_target)
+        if oversampling:
+            # OverSampling
+            ros = RandomOverSampler()
+            self._labeled_train_data, self._labeled_train_target = \
+                ros.fit_sample(self._labeled_train_data, self._labeled_train_target)
 
         self._labeled_validation_data = labeled_train_data[filtered_values][validation_index]
         self._labeled_validation_target = labeled_train_target[filtered_values][validation_index]
@@ -414,10 +416,25 @@ class LadderNetworksExperiment(object):
         return self._bootstrapped_indices, self._bootstrapped_targets
 
     def get_results(self):
-        prediction_results = pd.concat(self._prediction_results, ignore_index=True)
-        certainty_progression = pd.concat(self._certainty_progression, ignore_index=True)
-        features_progression = pd.concat(self._features_progression, ignore_index=True)
-        classes_distribution = pd.concat(self._classes_distribution, ignore_index=True)
+        try:
+            prediction_results = pd.concat(self._prediction_results, ignore_index=True)
+        except ValueError:
+            prediction_results = None
+
+        try:
+            certainty_progression = pd.concat(self._certainty_progression, ignore_index=True)
+        except ValueError:
+            certainty_progression = None
+
+        try:
+            features_progression = pd.concat(self._features_progression, ignore_index=True)
+        except ValueError:
+            features_progression = None
+
+        try:
+            classes_distribution = pd.concat(self._classes_distribution, ignore_index=True)
+        except ValueError:
+            classes_distribution = None
 
         return prediction_results, certainty_progression, features_progression, classes_distribution
 
@@ -461,8 +478,9 @@ class LadderNetworksExperiment(object):
                     if self._epochs_completed >= self._decay_after:
                         # decay learning rate
                         # learning_rate = starter_learning_rate * ((num_epochs - epoch_n) / (num_epochs - decay_after))
-                        ratio = 1.0 * (self._num_epochs - (self._epochs_completed + 1))  # epoch_n + 1 because learning rate is set for next epoch
-                        ratio = max(0, ratio / (self._num_epochs - self._decay_after))
+                        # epoch_n + 1 because learning rate is set for next epoch
+                        ratio = 1.0 * (self._num_epochs - (self._epochs_completed + 1))
+                        ratio = max(0., ratio / (self._num_epochs - self._decay_after))
                         sess.run(self._learning_rate.assign(self._starter_learning_rate * ratio))
 
                     bootstrap_mask[self._bootstrapped_indices] = False
@@ -599,7 +617,7 @@ if __name__ == '__main__':
                 min_count=args.min_count, validation_ratio=args.validation_ratio, noise_std=args.noise_std,
                 learning_rate=0.01, acceptance_threshold=args.acceptance_threshold, error_sigma=args.error_sigma,
                 lemma=lemma, random_seed=args.random_seed, normalize_data=args.word_vector_model_path is None,
-                max_error=args.max_error
+                max_error=args.max_error, oversampling=True
             )
 
             ladder_networks.run()
@@ -624,12 +642,27 @@ if __name__ == '__main__':
                        % (lemma, args.min_count), file=sys.stderr)
             continue
 
-    pd.concat(prediction_results, ignore_index=True) \
-        .to_csv('%s_prediction_results.csv' % args.base_results_path, index=False, float_format='%.2e')
-    pd.concat(certainty_progression, ignore_index=True) \
-        .to_csv('%s_certainty_progression.csv' % args.base_results_path, index=False, float_format='%.2e')
-    pd.concat(features_progression, ignore_index=True) \
-        .to_csv('%s_features_progression.csv' % args.base_results_path, index=False, float_format='%.2e')
-    pd.concat(classes_distribution, ignore_index=True) \
-        .to_csv('%s_classes_distribution.csv' % args.base_results_path, index=False, float_format='%.2e')
+    try:
+        pd.concat(prediction_results, ignore_index=True) \
+            .to_csv('%s_prediction_results.csv' % args.base_results_path, index=False, float_format='%.2e')
+    except (ValueError, MemoryError) as e:
+        print(e.args, file=sys.stderr)
+
+    try:
+        pd.concat(certainty_progression, ignore_index=True) \
+            .to_csv('%s_certainty_progression.csv' % args.base_results_path, index=False, float_format='%.2e')
+    except (ValueError, MemoryError) as e:
+        print(e.args, file=sys.stderr)
+
+    try:
+        pd.concat(features_progression, ignore_index=True) \
+            .to_csv('%s_features_progression.csv' % args.base_results_path, index=False, float_format='%.2e')
+    except (ValueError, MemoryError) as e:
+        print(e.args, file=sys.stderr)
+
+    try:
+        pd.concat(classes_distribution, ignore_index=True) \
+            .to_csv('%s_classes_distribution.csv' % args.base_results_path, index=False, float_format='%.2e')
+    except (ValueError, MemoryError) as e:
+        print(e.args, file=sys.stderr)
 

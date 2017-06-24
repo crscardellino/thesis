@@ -28,7 +28,7 @@ class SemiSupervisedWrapper(object):
     def __init__(self, labeled_train_data, labeled_train_target, labeled_test_data, labeled_test_target,
                  unlabeled_data, labeled_features, unlabeled_features, min_count=2, validation_ratio=0.1,
                  lemma='', acceptance_threshold=0.8, candidates_selection='max', candidates_limit=0, error_sigma=0.1,
-                 folds=0, random_seed=RANDOM_SEED, acceptance_alpha=0.05, error_alpha=0.05):
+                 folds=0, random_seed=RANDOM_SEED, acceptance_alpha=0.05, error_alpha=0.05, oversampling=False):
         filtered_values = filter_minimum(target=labeled_train_target[:], min_count=min_count)
 
         if folds > 0:
@@ -46,9 +46,11 @@ class SemiSupervisedWrapper(object):
             self._labeled_validation_target = labeled_train_target[filtered_values][validation_index]
             self._labeled_features = [labeled_features[idx] for idx in filtered_values[train_index]]
 
-        # OverSampling
-        ros = RandomOverSampler()
-        self._labeled_train_data, self._labeled_train_target = ros.fit_sample(self._labeled_train_data, self._labeled_train_target)
+        if oversampling:
+            # OverSampling
+            ros = RandomOverSampler()
+            self._labeled_train_data, self._labeled_train_target = \
+                ros.fit_sample(self._labeled_train_data, self._labeled_train_target)
 
         self._labeled_test_data = labeled_test_data
         self._labeled_test_target = labeled_test_target
@@ -216,9 +218,20 @@ class SemiSupervisedWrapper(object):
         return self._bootstrapped_indices, self._bootstrapped_targets
 
     def get_results(self):
-        prediction_results = pd.concat(self._prediction_results, ignore_index=True)
-        certainty_progression = pd.concat(self._certainty_progression, ignore_index=True)
-        features_progression = pd.concat(self._features_progression, ignore_index=True)
+        try:
+            prediction_results = pd.concat(self._prediction_results, ignore_index=True)
+        except ValueError:
+            prediction_results = None
+
+        try:
+            certainty_progression = pd.concat(self._certainty_progression, ignore_index=True)
+        except ValueError:
+            certainty_progression = None
+
+        try:
+            features_progression = pd.concat(self._features_progression, ignore_index=True)
+        except ValueError:
+            features_progression = None
 
         cross_validation_results = pd.concat(self._cross_validation_results, ignore_index=True)\
             if self._folds > 0 else None

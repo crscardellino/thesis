@@ -347,21 +347,7 @@ class LadderNetworksExperiment(object):
             [self._y_true, self._y_pred], feed_dict=feed_dict
         )
 
-        # For train corpus we need to append the bootstrapped data and targets
-        if corpus_split == 'train':
-            target = np.concatenate((self._labeled_train_target, self._bootstrapped_targets))
-            # Add the features of the new data to the progression
-            unlabeled_features = [self._unlabeled_features[idx] for idx in self._bootstrapped_indices]
-            features = self._labeled_features + unlabeled_features
-
-            for tgt, feats in zip(target, features):
-                feats = [_feature_transformer(f) for f in sorted(feats.items())]
-                fdf = pd.DataFrame(feats, columns=['feature', 'count'])
-                fdf.insert(0, 'target', np.int(tgt))
-                fdf.insert(0, 'iteration', iteration)
-
-                self._features_progression.append(fdf)
-        elif corpus_split == 'validation' and iteration != 'initial':
+        if corpus_split == 'validation' and iteration != 'initial':
             # Do not record the initial error
             self._error_progression.append(
                 zero_one_loss(y_true, y_pred)
@@ -511,11 +497,22 @@ class LadderNetworksExperiment(object):
                     self._bootstrapped_indices.extend(unlabeled_dataset_index[bootstrap_mask][candidates])
                     self._bootstrapped_targets.extend(target_candidates)
 
-                    class_distribution_df = pd.DataFrame(np.concatenate((self._labeled_train_target,
-                                                                         self._bootstrapped_targets)),
-                                                         columns=['target'])
+                    extended_target = np.concatenate((self._labeled_train_target, self._bootstrapped_targets))
+
+                    class_distribution_df = pd.DataFrame(extended_target, columns=['target'])
                     class_distribution_df.insert(0, 'iteration', self._epochs_completed)
                     self._classes_distribution.append(class_distribution_df)
+
+                    # Add the features of the new data to the progression
+                    unlabeled_features = [self._unlabeled_features[idx] for idx in self._bootstrapped_indices]
+                    extended_features = self._labeled_features + unlabeled_features
+
+                    for tgt, feats in zip(extended_target, extended_features):
+                        feats = [_feature_transformer(f) for f in sorted(feats.items())]
+                        fdf = pd.DataFrame(feats, columns=['feature', 'count'])
+                        fdf.insert(0, 'target', np.int(tgt))
+                        fdf.insert(0, 'iteration', self._epochs_completed)
+                        self._features_progression.append(fdf)
 
                     if self._epochs_completed > 1:
                         min_progression_error = min(self._error_progression[:-1])
@@ -613,7 +610,7 @@ if __name__ == '__main__':
                 min_count=args.min_count, validation_ratio=args.validation_ratio, noise_std=args.noise_std,
                 learning_rate=0.01, acceptance_threshold=args.acceptance_threshold, error_sigma=args.error_sigma,
                 lemma=lemma, random_seed=args.random_seed, normalize_data=args.word_vector_model_path is None,
-                max_error=args.max_error, oversampling=True
+                oversampling=True
             )
 
             ladder_networks.run()

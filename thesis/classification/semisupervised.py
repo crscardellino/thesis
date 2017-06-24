@@ -143,6 +143,10 @@ class SemiSupervisedWrapper(object):
                 fdf.insert(0, 'iteration', iteration)
 
                 self._features_progression.append(fdf)
+        elif corpus_split == 'test' and iteration == 'final':
+            error = zero_one_loss(target, self._model.predict(data))
+            tqdm.write('Test error: %.2f - Test accuracy: %.2f' % (error, 1.0 - error),
+                       file=sys.stderr, end='\n\n')
 
         # Calculate cross entropy error (perhaps better with the algorithm by itself)
         # and update the results of the iteration giving the predictions
@@ -265,23 +269,14 @@ class SemiSupervisedWrapper(object):
 
             candidates = self._get_candidates(prediction_probabilities)
 
-            if len(candidates) == 0:  # Can't get more candidates
-                if iteration == 0 or self._acceptance_threshold >= 0.75:
-                    # Check there is at least 1 iteration running. If not, adapt the acceptance threshold
-                    # Also, if the acceptance threshold is too high
-                    self._acceptance_threshold -= self._acceptance_alpha
-                    if self._acceptance_threshold >= 0.4:  # Otherwise is too low
-                        continue
-                    else:
-                        tqdm.write('Lemma %s - Max predicted probability: %.2f - Acceptance threshold: %.2f - Iterations: %d'
-                                   % (self._lemma, prediction_probabilities.max(), self._acceptance_threshold, iteration),
-                                   file=sys.stderr)
-                        break
-                else:  # There was at least one iteration.
-                    tqdm.write('Lemma %s - Max predicted probability: %.2f - Acceptance threshold: %.2f'
-                               % (self._lemma, prediction_probabilities.max(), self._acceptance_threshold),
-                               file=sys.stderr)
-                    break
+            if len(candidates) == 0 and self._acceptance_threshold > 0.5:  # No candidates, lower the threshold
+                self._acceptance_threshold -= self._acceptance_alpha
+                continue
+            elif len(candidates) == 0:
+                tqdm.write('Lemma %s - Max predicted probability: %.2f - Acceptance threshold: %.2f'
+                           % (self._lemma, prediction_probabilities.max(), self._acceptance_threshold),
+                           file=sys.stderr)
+                break
 
             data_candidates = masked_unlabeled_data[candidates]
             target_candidates = self._get_target_candidates(prediction_probabilities, candidates)
@@ -302,17 +297,9 @@ class SemiSupervisedWrapper(object):
             min_progression_error = min(self._error_progression)
 
             if self._error_sigma > 0 and validation_error > min_progression_error + self._error_sigma:
-                if iteration == 0 or self._error_sigma <= 0.25:
-                    # Check there is at least 1 iteration running. If not, adapt the error_sigma
-                    # Also if the error sigma is too low
+                if self._error_sigma < 0.5:
                     self._error_sigma += self._error_alpha
-                    if self._error_sigma < 0.5: # So the error is not so high
-                        continue
-                    else:
-                        tqdm.write('Lemma %s - Validation error: %.2f - Progression min error: %.2f - Iterations: %d'
-                                   % (self._lemma, validation_error, min_progression_error, iteration),
-                                   file=sys.stderr)
-                        break
+                    continue
                 else:  # There was at least one iteration.
                     tqdm.write('Lemma %s - Validation error: %.2f - Progression min error: %.2f'
                                % (self._lemma, validation_error, min_progression_error), file=sys.stderr)

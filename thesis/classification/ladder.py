@@ -32,7 +32,7 @@ class LadderNetworksExperiment(object):
                  unlabeled_data, labeled_features, unlabeled_features, layers, denoising_cost, min_count=2, lemma='',
                  validation_ratio=0.2, acceptance_threshold=0.8, error_sigma=0.1, epochs=25, noise_std=0.3,
                  learning_rate=0.01, random_seed=RANDOM_SEED, acceptance_alpha=0.05, error_alpha=0.05,
-                 normalize_data=False, max_error=0.15, decay_after=15, oversampling=False):
+                 normalize_data=False, decay_after=15, oversampling=False):
         labeled_train_data = labeled_train_data.toarray() if issparse(labeled_train_data) else labeled_train_data
         labeled_test_data = labeled_test_data.toarray() if issparse(labeled_test_data) else labeled_test_data
         unlabeled_data = unlabeled_data.toarray() if issparse(unlabeled_data) else unlabeled_data
@@ -78,7 +78,6 @@ class LadderNetworksExperiment(object):
         self._lemma = lemma
         self._acceptance_threshold = acceptance_threshold
         self._acceptance_alpha = acceptance_alpha
-        self._max_error = max_error
         self._decay_after = decay_after
         self._error_sigma = error_sigma
         self._error_alpha = error_alpha
@@ -368,8 +367,9 @@ class LadderNetworksExperiment(object):
                 zero_one_loss(y_true, y_pred)
             )
         elif corpus_split == 'test' and iteration == 'final':
-            tqdm.write('Test error: %.2f' % zero_one_loss(y_true, y_pred), file=sys.stderr, end='\n\n')
-            tqdm.write('Test accuracy: %.2f' % accuracy_score(y_true, y_pred), file=sys.stderr, end='\n\n')
+            error = zero_one_loss(y_true, y_pred)
+            tqdm.write('Test error: %.2f - Test accuracy: %.2f' % (error, 1.0 - error),
+                       file=sys.stderr, end='\n\n')
 
         # Calculate cross entropy error (perhaps better with the algorithm by itself)
         # and update the results of the iteration giving the predictions
@@ -496,30 +496,26 @@ class LadderNetworksExperiment(object):
                     for corpus_split in ('train', 'validation'):
                         self._add_result(sess, corpus_split, self._epochs_completed, feed_dicts[corpus_split])
 
-                    tqdm.write('Epoch %d - Last error %.2f - Train error %.2f'
-                               % (self._epochs_completed, self._error_progression[-1], error), file=sys.stderr)
+                    # To compare against the bootstrap approach we use a similar way to select elements
+                    # automatically annotated from the unlabeled corpus that we use after to see
+                    # the classes progression
+                    candidates = self._get_candidates(prediction_probabilities)
 
-                    if len(self._error_progression) > 0 and self._error_progression[-1] <= self._max_error:
-                        # To compare against the bootstrap approach we use a similar way to select elements
-                        # automatically annotated from the unlabeled corpus that we use after to see
-                        # the classes progression
+                    while len(candidates) == 0 and self._acceptance_threshold > 0.5:
+                        # Check there is at least 1 iteration running. If not, adapt the acceptance threshold
+                        # Also, if the acceptance threshold is too high
+                        self._acceptance_threshold -= self._acceptance_alpha
                         candidates = self._get_candidates(prediction_probabilities)
 
-                        while len(candidates) == 0 and self._acceptance_threshold > 0.5:
-                            # Check there is at least 1 iteration running. If not, adapt the acceptance threshold
-                            # Also, if the acceptance threshold is too high
-                            self._acceptance_threshold -= self._acceptance_alpha
-                            candidates = self._get_candidates(prediction_probabilities)
+                    target_candidates = self._classes[prediction_probabilities[candidates].argmax(axis=1)]
+                    self._bootstrapped_indices.extend(unlabeled_dataset_index[bootstrap_mask][candidates])
+                    self._bootstrapped_targets.extend(target_candidates)
 
-                        target_candidates = self._classes[prediction_probabilities[candidates].argmax(axis=1)]
-                        self._bootstrapped_indices.extend(unlabeled_dataset_index[bootstrap_mask][candidates])
-                        self._bootstrapped_targets.extend(target_candidates)
-
-                        class_distribution_df = pd.DataFrame(np.concatenate((self._labeled_train_target,
-                                                                             self._bootstrapped_targets)),
-                                                             columns=['target'])
-                        class_distribution_df.insert(0, 'iteration', self._epochs_completed)
-                        self._classes_distribution.append(class_distribution_df)
+                    class_distribution_df = pd.DataFrame(np.concatenate((self._labeled_train_target,
+                                                                         self._bootstrapped_targets)),
+                                                         columns=['target'])
+                    class_distribution_df.insert(0, 'iteration', self._epochs_completed)
+                    self._classes_distribution.append(class_distribution_df)
 
                     if self._epochs_completed > 1:
                         min_progression_error = min(self._error_progression[:-1])

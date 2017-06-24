@@ -9,6 +9,7 @@ import sys
 
 from imblearn.over_sampling import RandomOverSampler
 from itertools import compress
+from scipy.sparse import issparse
 from sklearn.metrics import zero_one_loss
 from sklearn.model_selection import StratifiedKFold, KFold
 from thesis.classification import BaselineClassifier
@@ -30,6 +31,9 @@ class SemiSupervisedWrapper(object):
                  lemma='', acceptance_threshold=0.8, candidates_selection='max', candidates_limit=0, error_sigma=0.1,
                  folds=0, random_seed=RANDOM_SEED, acceptance_alpha=0.05, error_alpha=0.05, oversampling=False):
         filtered_values = filter_minimum(target=labeled_train_target[:], min_count=min_count)
+        labeled_train_data = labeled_train_data.toarray() if issparse(labeled_train_data) else labeled_train_data
+        labeled_test_data = labeled_test_data.toarray() if issparse(labeled_test_data) else labeled_test_data
+        unlabeled_data = unlabeled_data.toarray() if issparse(unlabeled_data) else unlabeled_data
 
         if folds > 0:
             self._labeled_train_data = labeled_train_data[filtered_values]
@@ -297,7 +301,7 @@ class SemiSupervisedWrapper(object):
             min_progression_error = min(self._error_progression)
 
             if self._error_sigma > 0 and validation_error > min_progression_error + self._error_sigma:
-                if self._error_sigma < 0.5:
+                if self._error_sigma < 0.3:
                     self._error_sigma += self._error_alpha
                     continue
                 else:  # There was at least one iteration.

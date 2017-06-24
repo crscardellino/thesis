@@ -31,7 +31,7 @@ class LadderNetworksExperiment(object):
                  unlabeled_data, labeled_features, unlabeled_features, layers, denoising_cost, min_count=2, lemma='',
                  validation_ratio=0.2, acceptance_threshold=0.8, error_sigma=0.1, epochs=25, noise_std=0.3,
                  learning_rate=0.01, random_seed=RANDOM_SEED, acceptance_alpha=0.05, error_alpha=0.05,
-                 decay_after=15, oversampling=False):
+                 decay_after=15, oversampling=False, predictions_only=False):
         labeled_train_data = labeled_train_data.toarray() if issparse(labeled_train_data) else labeled_train_data
         labeled_test_data = labeled_test_data.toarray() if issparse(labeled_test_data) else labeled_test_data
         unlabeled_data = unlabeled_data.toarray() if issparse(unlabeled_data) else unlabeled_data
@@ -72,6 +72,7 @@ class LadderNetworksExperiment(object):
         self._decay_after = decay_after
         self._error_sigma = error_sigma
         self._error_alpha = error_alpha
+        self._predictions_only = predictions_only
         self._error_progression = []
 
         self._input_size = self._labeled_train_data.shape[1]
@@ -460,50 +461,51 @@ class LadderNetworksExperiment(object):
                         ratio = max(0., ratio / (self._num_epochs - self._decay_after))
                         sess.run(self._learning_rate.assign(self._starter_learning_rate * ratio))
 
-                    bootstrap_mask[self._bootstrapped_indices] = False
-                    masked_unlabeled_data = self._unlabeled_data[bootstrap_mask]
-                    prediction_probabilities = sess.run(self._y, feed_dict={self._inputs: masked_unlabeled_data})
-
-                    # Add the certainty of the predicted classes of the unseen examples
-                    # to the certainty progression results
-                    certainty_df = pd.DataFrame(prediction_probabilities.max(axis=1), columns=['certainty'])
-                    certainty_df.insert(0, 'iteration', self._epochs_completed)
-                    self._certainty_progression.append(certainty_df)
-
                     for corpus_split in ('train', 'validation'):
                         self._add_result(sess, corpus_split, self._epochs_completed, feed_dicts[corpus_split])
 
-                    # To compare against the bootstrap approach we use a similar way to select elements
-                    # automatically annotated from the unlabeled corpus that we use after to see
-                    # the classes progression
-                    candidates = self._get_candidates(prediction_probabilities)
+                    if not self._predictions_only:
+                        bootstrap_mask[self._bootstrapped_indices] = False
+                        masked_unlabeled_data = self._unlabeled_data[bootstrap_mask]
+                        prediction_probabilities = sess.run(self._y, feed_dict={self._inputs: masked_unlabeled_data})
 
-                    while len(candidates) == 0 and self._acceptance_threshold > 0.5:
-                        # Check there is at least 1 iteration running. If not, adapt the acceptance threshold
-                        # Also, if the acceptance threshold is too high
-                        self._acceptance_threshold -= self._acceptance_alpha
+                        # Add the certainty of the predicted classes of the unseen examples
+                        # to the certainty progression results
+                        certainty_df = pd.DataFrame(prediction_probabilities.max(axis=1), columns=['certainty'])
+                        certainty_df.insert(0, 'iteration', self._epochs_completed)
+                        self._certainty_progression.append(certainty_df)
+
+                        # To compare against the bootstrap approach we use a similar way to select elements
+                        # automatically annotated from the unlabeled corpus that we use after to see
+                        # the classes progression
                         candidates = self._get_candidates(prediction_probabilities)
 
-                    target_candidates = self._classes[prediction_probabilities[candidates].argmax(axis=1)]
-                    self._bootstrapped_indices.extend(unlabeled_dataset_index[bootstrap_mask][candidates])
-                    self._bootstrapped_targets.extend(target_candidates)
+                        while len(candidates) == 0 and self._acceptance_threshold > 0.5:
+                            # Check there is at least 1 iteration running. If not, adapt the acceptance threshold
+                            # Also, if the acceptance threshold is too high
+                            self._acceptance_threshold -= self._acceptance_alpha
+                            candidates = self._get_candidates(prediction_probabilities)
 
-                    extended_target = np.concatenate((self._labeled_train_target, self._bootstrapped_targets))
+                        target_candidates = self._classes[prediction_probabilities[candidates].argmax(axis=1)]
+                        self._bootstrapped_indices.extend(unlabeled_dataset_index[bootstrap_mask][candidates])
+                        self._bootstrapped_targets.extend(target_candidates)
 
-                    class_distribution_df = pd.DataFrame(extended_target, columns=['target'])
-                    class_distribution_df.insert(0, 'iteration', self._epochs_completed)
-                    self._classes_distribution.append(class_distribution_df)
+                        extended_target = np.concatenate((self._labeled_train_target, self._bootstrapped_targets))
 
-                    # Add the features of the new data to the progression
-                    unlabeled_features = [self._unlabeled_features[idx] for idx in self._bootstrapped_indices]
-                    extended_features = self._labeled_features + unlabeled_features
+                        class_distribution_df = pd.DataFrame(extended_target, columns=['target'])
+                        class_distribution_df.insert(0, 'iteration', self._epochs_completed)
+                        self._classes_distribution.append(class_distribution_df)
 
-                    for tgt, feats in zip(extended_target, extended_features):
-                        feats = [_feature_transformer(f) for f in sorted(feats.items())]
-                        fdf = pd.DataFrame(feats, columns=['feature', 'count'])
-                        fdf.insert(0, 'target', np.int(tgt))
-                        fdf.insert(0, 'iteration', self._epochs_completed)
-                        self._features_progression.append(fdf)
+                        # Add the features of the new data to the progression
+                        unlabeled_features = [self._unlabeled_features[idx] for idx in self._bootstrapped_indices]
+                        extended_features = self._labeled_features + unlabeled_features
+
+                        for tgt, feats in zip(extended_target, extended_features):
+                            feats = [_feature_transformer(f) for f in sorted(feats.items())]
+                            fdf = pd.DataFrame(feats, columns=['feature', 'count'])
+                            fdf.insert(0, 'target', np.int(tgt))
+                            fdf.insert(0, 'iteration', self._epochs_completed)
+                            self._features_progression.append(fdf)
 
                     if self._epochs_completed > 1:
                         min_progression_error = min(self._error_progression[:-1])
@@ -543,6 +545,7 @@ if __name__ == '__main__':
     parser.add_argument('--corpus_name', default='NA')
     parser.add_argument('--representation', default='NA')
     parser.add_argument('--vector_domain', default='NA')
+    parser.add_argument('--predictions_only', action='store_true')
 
     args = parser.parse_args()
 
@@ -602,7 +605,7 @@ if __name__ == '__main__':
                 unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
                 min_count=args.min_count, validation_ratio=args.validation_ratio, noise_std=args.noise_std,
                 learning_rate=0.01, acceptance_threshold=args.acceptance_threshold, error_sigma=args.error_sigma,
-                lemma=lemma, random_seed=args.random_seed, oversampling=True)
+                lemma=lemma, random_seed=args.random_seed, oversampling=True, predictions_only=args.predictions_only)
 
             ladder_networks.run()
 

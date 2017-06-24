@@ -30,7 +30,7 @@ class SemiSupervisedWrapper(object):
                  unlabeled_data, labeled_features, unlabeled_features, min_count=2, validation_ratio=0.1,
                  lemma='', acceptance_threshold=0.8, candidates_selection='max', candidates_limit=0, error_sigma=0.1,
                  folds=0, random_seed=RANDOM_SEED, acceptance_alpha=0.05, error_alpha=0.05, oversampling=False,
-                 max_annotations=0):
+                 max_annotations=0, predictions_only=False):
         filtered_values = filter_minimum(target=labeled_train_target[:], min_count=min_count)
         labeled_train_data = labeled_train_data.toarray() if issparse(labeled_train_data) else labeled_train_data
         labeled_test_data = labeled_test_data.toarray() if issparse(labeled_test_data) else labeled_test_data
@@ -82,6 +82,7 @@ class SemiSupervisedWrapper(object):
         self._candidates_selection = candidates_selection
         self._candidates_limit = candidates_limit
         self._max_annotations = max_annotations
+        self._predictions_only = predictions_only
 
     @property
     def classes(self):
@@ -138,17 +139,18 @@ class SemiSupervisedWrapper(object):
             data = sps.vstack(data) if sps.issparse(self._labeled_train_data) else np.vstack(data)
             target = np.concatenate((target, self._bootstrapped_targets))
 
-            # Add the features of the new data to the progression
-            unlabeled_features = [self._unlabeled_features[idx] for idx in self._bootstrapped_indices]
-            features = self._labeled_features + unlabeled_features
+            if not self._predictions_only:
+                # Add the features of the new data to the progression
+                unlabeled_features = [self._unlabeled_features[idx] for idx in self._bootstrapped_indices]
+                features = self._labeled_features + unlabeled_features
 
-            for tgt, feats in zip(target, features):
-                feats = [_feature_transformer(f) for f in sorted(feats.items())]
-                fdf = pd.DataFrame(feats, columns=['feature', 'count'])
-                fdf.insert(0, 'target', np.int(tgt))
-                fdf.insert(0, 'iteration', iteration)
+                for tgt, feats in zip(target, features):
+                    feats = [_feature_transformer(f) for f in sorted(feats.items())]
+                    fdf = pd.DataFrame(feats, columns=['feature', 'count'])
+                    fdf.insert(0, 'target', np.int(tgt))
+                    fdf.insert(0, 'iteration', iteration)
 
-                self._features_progression.append(fdf)
+                    self._features_progression.append(fdf)
         elif corpus_split == 'test' and iteration == 'final':
             error = zero_one_loss(target, self._model.predict(data))
             tqdm.write('Test error: %.2f - Test accuracy: %.2f' % (error, 1.0 - error),
@@ -328,13 +330,14 @@ class SemiSupervisedWrapper(object):
             self._error_progression.append(validation_error)
             iteration += 1
 
-            # Add the certainty of the predicted classes of the unseen examples to the certainty progression results
-            certainty_df = pd.DataFrame(prediction_probabilities.max(axis=1), columns=['certainty'])
-            certainty_df.insert(0, 'iteration', iteration)
-            self._certainty_progression.append(certainty_df)
-
             for corpus_split in ('train', 'validation'):
                 self._add_results(corpus_split, iteration)
+
+            if not self._predictions_only:
+                # Add the certainty of the predicted classes of the unseen examples to the certainty progression results
+                certainty_df = pd.DataFrame(prediction_probabilities.max(axis=1), columns=['certainty'])
+                certainty_df.insert(0, 'iteration', iteration)
+                self._certainty_progression.append(certainty_df)
 
         if len(self._bootstrapped_indices) >= self._unlabeled_data.shape[0]:
             tqdm.write('Lemma %s - Run all iterations' % self._lemma, file=sys.stderr)

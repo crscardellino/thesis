@@ -42,6 +42,7 @@ if __name__ == '__main__':
     parser.add_argument('--corpus_name', default='NA')
     parser.add_argument('--representation', default='NA')
     parser.add_argument('--vector_domain', default='NA')
+    parser.add_argument('--predictions_only', action='store_true')
 
     args = parser.parse_args()
 
@@ -127,14 +128,13 @@ if __name__ == '__main__':
                     acceptance_threshold=args.acceptance_threshold, random_seed=args.random_seed,
                     unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
                     candidates_limit=args.candidates_limit, error_sigma=args.error_sigma, lemma=lemma,
-                    oversampling=True)
+                    oversampling=True, predictions_only=args.predictions_only)
 
                 iterations = semisupervised.run(CLASSIFIERS[args.classifier], config)
 
                 if iterations > 0:
                     for rst_agg, rst in zip(results, semisupervised.get_results()):
                         if rst is not None:
-                            rst.insert(0, 'max_iterations', iterations)
                             rst.insert(0, 'error_sigma', semisupervised.error_sigma)
                             rst.insert(0, 'acceptance_threshold', semisupervised.acceptance_threshold)
                             rst.insert(0, 'num_classes', semisupervised.classes.shape[0])
@@ -163,8 +163,9 @@ if __name__ == '__main__':
     print('Saving results', file=sys.stderr)
 
     try:
-        pd.DataFrame({'instance': bootstrapped_instances, 'predicted_target': bootstrapped_targets}) \
-            .to_csv('%s_unlabeled_dataset_predictions.csv' % args.base_results_path, index=False)
+        if not args.predictions_only:
+            pd.DataFrame({'instance': bootstrapped_instances, 'predicted_target': bootstrapped_targets}) \
+                .to_csv('%s_unlabeled_dataset_predictions.csv' % args.base_results_path, index=False)
     except (ValueError, MemoryError) as e:
         print(e.args, file=sys.stderr)
 

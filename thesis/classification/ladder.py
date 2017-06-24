@@ -610,19 +610,19 @@ if __name__ == '__main__':
             ladder_networks.run()
 
             for rst_agg, rst in zip(results, ladder_networks.get_results()):
-                rst.insert(0, 'max_iterations', ladder_networks.epochs_completed)
-                rst.insert(0, 'error_sigma', ladder_networks.error_sigma)
-                rst.insert(0, 'acceptance_threshold', ladder_networks.acceptance_threshold)
-                rst.insert(0, 'num_classes', ladder_networks.classes.shape[0])
-                rst.insert(0, 'lemma', lemma)
-                rst.insert(0, 'noise', args.noise_std)
-                rst.insert(0, 'epochs', args.epochs)
-                rst.insert(0, 'layers', '_'.join(str(l) for l in args.layers))
-                rst.insert(0, 'classifier', 'ladder')
-                rst.insert(0, 'vector_domain', args.vector_domain or 'NA')
-                rst.insert(0, 'representation', args.representation or 'NA')
-                rst.insert(0, 'corpus', args.corpus_name)
-                rst_agg.append(rst)
+                if rst is not None:
+                    rst.insert(0, 'error_sigma', ladder_networks.error_sigma)
+                    rst.insert(0, 'acceptance_threshold', ladder_networks.acceptance_threshold)
+                    rst.insert(0, 'num_classes', ladder_networks.classes.shape[0])
+                    rst.insert(0, 'lemma', lemma)
+                    rst.insert(0, 'noise', args.noise_std)
+                    rst.insert(0, 'epochs', args.epochs)
+                    rst.insert(0, 'layers', '_'.join(str(l) for l in args.layers))
+                    rst.insert(0, 'classifier', 'ladder')
+                    rst.insert(0, 'vector_domain', args.vector_domain or 'NA')
+                    rst.insert(0, 'representation', args.representation or 'NA')
+                    rst.insert(0, 'corpus', args.corpus_name)
+                    rst_agg.append(rst)
 
             # Save the bootstrapped data
             bi, bt = ladder_networks.bootstrapped()
@@ -637,8 +637,9 @@ if __name__ == '__main__':
             continue
 
     try:
-        pd.DataFrame({'instance': bootstrapped_instances, 'predicted_target': bootstrapped_targets}) \
-            .to_csv('%s_unlabeled_dataset_predictions.csv' % args.base_results_path, index=False)
+        if not args.predictions_only:
+            pd.DataFrame({'instance': bootstrapped_instances, 'predicted_target': bootstrapped_targets}) \
+                .to_csv('%s_unlabeled_dataset_predictions.csv' % args.base_results_path, index=False)
     except (ValueError, MemoryError) as e:
         print(e.args, file=sys.stderr)
 

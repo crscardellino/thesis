@@ -65,6 +65,7 @@ class SemiSupervisedWrapper(object):
         self._lemma = lemma
         self._classes = np.unique(self._labeled_train_target)
         self._bootstrapped_indices = []
+        self._invalid_indices = []  # Only think for the case of Active Learning
         self._bootstrapped_targets = []
         self._model = None
 
@@ -277,6 +278,7 @@ class SemiSupervisedWrapper(object):
                 break
 
             bootstrap_mask[self._bootstrapped_indices] = False
+            bootstrap_mask[self._invalid_indices] = False
             masked_unlabeled_data = self._unlabeled_data[bootstrap_mask]
             prediction_probabilities = self._model.predict_proba(masked_unlabeled_data)
 
@@ -291,8 +293,14 @@ class SemiSupervisedWrapper(object):
                            file=sys.stderr)
                 break
 
-            data_candidates = masked_unlabeled_data[candidates]
             target_candidates = self._get_target_candidates(prediction_probabilities, candidates)
+
+            invalid_candidates = np.where(target_candidates == -1)[0]
+            self._invalid_indices.extend(unlabeled_dataset_index[bootstrap_mask][candidates][invalid_candidates])
+            valid_candidates = np.where(target_candidates != -1)[0]
+
+            data_candidates = masked_unlabeled_data[candidates[valid_candidates]]
+            target_candidates = target_candidates[valid_candidates]
 
             train_data = (self._labeled_train_data, self._unlabeled_data[self._bootstrapped_indices], data_candidates)
             train_data = sps.vstack(train_data) if sps.issparse(self._labeled_train_data) else np.vstack(train_data)
@@ -381,16 +389,19 @@ class ActiveLearningWrapper(SemiSupervisedWrapper):
                 for idx, (sense, description) in enumerate(self._senses):
                     print('%d ) %s: %s' % (idx, sense, description), file=sys.stderr)
                 sense = input('Sense: ')
-                while not sense.isdigit() or not (0 <= int(sense) < len(self._senses)):
+                while not sense.isdigit() or not (-1 <= int(sense) < len(self._senses)):
                     sense = input('Sense: ')
                 sense = int(sense)
 
                 print(file=sys.stderr)
 
-                if self._senses[sense][0] not in self._train_classes:
+                if sense != -1 and self._senses[sense][0] not in self._train_classes:
                     self._train_classes[self._senses[sense][0]] = len(self._train_classes)
 
-                labeled_targets.append(self._train_classes[self._senses[sense][0]])
+                if sense != -1:
+                    labeled_targets.append(self._train_classes[self._senses[sense][0]])
+                else:
+                    labeled_targets.append(sense)
 
             return labeled_targets
 

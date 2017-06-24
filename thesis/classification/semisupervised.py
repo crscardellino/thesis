@@ -388,10 +388,14 @@ class ActiveLearningWrapper(SemiSupervisedWrapper):
                 print('*' * 50 + '\nSelect the sense for the previous sentence:', file=sys.stderr)
                 for idx, (sense, description) in enumerate(self._senses):
                     print('%d ) %s: %s' % (idx, sense, description), file=sys.stderr)
-                sense = input('Sense: ')
-                while not sense.isdigit() or not (-1 <= int(sense) < len(self._senses)):
+                while True:
                     sense = input('Sense: ')
-                sense = int(sense)
+                    try:
+                        sense = int(sense)
+                    except ValueError:
+                        continue
+                    if -1 <= sense < len(self._senses):
+                        break
 
                 print(file=sys.stderr)
 

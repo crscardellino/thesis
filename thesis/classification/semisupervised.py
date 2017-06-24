@@ -29,7 +29,8 @@ class SemiSupervisedWrapper(object):
     def __init__(self, labeled_train_data, labeled_train_target, labeled_test_data, labeled_test_target,
                  unlabeled_data, labeled_features, unlabeled_features, min_count=2, validation_ratio=0.1,
                  lemma='', acceptance_threshold=0.8, candidates_selection='max', candidates_limit=0, error_sigma=0.1,
-                 folds=0, random_seed=RANDOM_SEED, acceptance_alpha=0.05, error_alpha=0.05, oversampling=False):
+                 folds=0, random_seed=RANDOM_SEED, acceptance_alpha=0.05, error_alpha=0.05, oversampling=False,
+                 max_annotations=0):
         filtered_values = filter_minimum(target=labeled_train_target[:], min_count=min_count)
         labeled_train_data = labeled_train_data.toarray() if issparse(labeled_train_data) else labeled_train_data
         labeled_test_data = labeled_test_data.toarray() if issparse(labeled_test_data) else labeled_test_data
@@ -80,6 +81,7 @@ class SemiSupervisedWrapper(object):
         self._acceptance_alpha = acceptance_alpha
         self._candidates_selection = candidates_selection
         self._candidates_limit = candidates_limit
+        self._max_annotations = max_annotations
 
     @property
     def classes(self):
@@ -267,6 +269,11 @@ class SemiSupervisedWrapper(object):
         unlabeled_dataset_index = np.arange(self._unlabeled_data.shape[0], dtype=np.int32)
 
         while len(self._bootstrapped_indices) < self._unlabeled_data.shape[0]:
+            if 0 < self._max_annotations <= len(self._bootstrapped_indices):
+                tqdm.write('Lemma %s - Max annotations reached: %d' %
+                           (self._lemma, self._max_annotations), file=sys.stderr)
+                break
+
             bootstrap_mask[self._bootstrapped_indices] = False
             masked_unlabeled_data = self._unlabeled_data[bootstrap_mask]
             prediction_probabilities = self._model.predict_proba(masked_unlabeled_data)

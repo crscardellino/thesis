@@ -28,6 +28,7 @@ if __name__ == '__main__':
     parser.add_argument('--unlabeled_dataset_path', default=None)
     parser.add_argument('--full_senses_path', default=None)
     parser.add_argument('--sentences_path', default=None)
+    parser.add_argument('--max_annotations', type=int, default=0)
     parser.add_argument('--simulation_indices_path', default=None)
     parser.add_argument('--word_vector_model_path', default=None)
     parser.add_argument('--labeled_dataset_extra', default=None)
@@ -98,6 +99,8 @@ if __name__ == '__main__':
                                            test_dataset_extra=labeled_datasets_extra_path % 'test'
                                            if labeled_datasets_extra_path is not None else None)
 
+    full_senses_dict = None
+
     if args.unlabeled_dataset_path:
         unlabeled_dataset_path = os.path.join(args.unlabeled_dataset_path, 'dataset.npz')
         unlabeled_features_path = os.path.join(args.unlabeled_dataset_path, 'features.p')
@@ -112,13 +115,11 @@ if __name__ == '__main__':
                                                    dataset_extra=unlabeled_dataset_extra_path)
         initial_indices = None
         unlabeled_indices = None
-
     else:
         simulation_indices = np.load(args.simulation_indices_path)
         initial_indices = simulation_indices['initial_indices']
         unlabeled_indices = simulation_indices['unlabeled_indices']
         unlabeled_dataset = None
-        full_senses_dict = None
 
     if args.full_senses_path is not None:
         with open(args.full_senses_path, 'rb') as f:
@@ -193,7 +194,8 @@ if __name__ == '__main__':
                     validation_ratio=args.validation_ratio, candidates_selection=args.candidates_selection,
                     candidates_limit=args.candidates_limit, unlabeled_features=unlabeled_features,
                     error_sigma=args.error_sigma, folds=args.folds, random_seed=args.random_seed,
-                    acceptance_threshold=0, unlabeled_sentences=lemma_unlabeled_sentences, train_classes=train_classes
+                    acceptance_threshold=0, unlabeled_sentences=lemma_unlabeled_sentences, train_classes=train_classes,
+                    max_annotations=args.max_annotations
                 )
 
                 iterations = semisupervised.run(CLASSIFIERS[args.classifier], config)

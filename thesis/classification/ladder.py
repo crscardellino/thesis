@@ -589,6 +589,8 @@ if __name__ == '__main__':
     features_progression = []
     classes_distribution = []
     results = (prediction_results, certainty_progression, features_progression, classes_distribution)
+    bootstrapped_instances = []
+    bootstrapped_targets = []
 
     print('Running experiments per lemma', file=sys.stderr)
     for lemma, data, target, features in \
@@ -630,10 +632,23 @@ if __name__ == '__main__':
                 rst.insert(0, 'corpus', args.corpus_name)
                 rst_agg.append(rst)
 
+            # Save the bootstrapped data
+            bi, bt = ladder_networks.bootstrapped()
+            bootstrapped_targets.extend(bt)
+
+            ul_instances = unlabeled_dataset.instances_id(lemma, limit=args.unlabeled_data_limit)
+            bootstrapped_instances.extend(':'.join(ul_instances[idx]) for idx in bi)
+
         except NotEnoughSensesError:
             tqdm.write('The lemma %s doesn\'t have enough senses with at least %d occurrences'
                        % (lemma, args.min_count), file=sys.stderr)
             continue
+
+    try:
+        pd.DataFrame({'instance': bootstrapped_instances, 'predicted_target': bootstrapped_targets}) \
+            .to_csv('%s_unlabeled_dataset_predictions.csv' % args.base_results_path, index=False)
+    except (ValueError, MemoryError) as e:
+        print(e.args, file=sys.stderr)
 
     try:
         pd.concat(prediction_results, ignore_index=True) \

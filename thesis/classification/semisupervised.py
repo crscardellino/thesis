@@ -333,7 +333,7 @@ class SemiSupervisedWrapper(object):
             else:
                 self._model = new_model
 
-            self._bootstrapped_indices.extend(unlabeled_dataset_index[bootstrap_mask][candidates])
+            self._bootstrapped_indices.extend(unlabeled_dataset_index[bootstrap_mask][candidates][valid_candidates])
             self._bootstrapped_targets.extend(target_candidates)
             self._error_progression.append(validation_error)
             iteration += 1
@@ -407,7 +407,7 @@ class ActiveLearningWrapper(SemiSupervisedWrapper):
                 else:
                     labeled_targets.append(sense)
 
-            return labeled_targets
+            return np.array(labeled_targets, dtype=np.int32)
 
     def get_senses(self):
         senses_description = dict(self._senses)

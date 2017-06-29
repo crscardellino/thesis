@@ -78,15 +78,16 @@ if __name__ == '__main__':
                     'prediction': sentence.predicted_target_mapping
                 })
 
-            print('Number of evaluated samples so far: %d' % len(results[(algorithm, lemma)]), file=sys.stderr)
-            print('Accuracy so far: %.2f' % (correct / len(results[(algorithm, lemma)])), file=sys.stderr)
-
             if sense == -2:
                 break
 
-        final_results.append(pd.DataFrame(results[(algorithm, lemma)],
-                                          columns=['algorithm', 'lemma', 'instance', 'true', 'prediction']))
-        final_results[-1].insert(2, 'final_accuracy', (correct / len(results[(algorithm, lemma)])))
+            print('Number of evaluated samples so far: %d' % len(results[(algorithm, lemma)]), file=sys.stderr)
+            print('Accuracy so far: %.2f' % (correct / len(results[(algorithm, lemma)])), file=sys.stderr)
+
+        if len(results[(algorithm, lemma)]) > 0:
+            final_results.append(pd.DataFrame(results[(algorithm, lemma)],
+                                              columns=['algorithm', 'lemma', 'instance', 'true', 'prediction']))
+            final_results[-1].insert(2, 'final_accuracy', (correct / len(results[(algorithm, lemma)])))
 
     final_results = pd.concat(final_results, ignore_index=True)
     final_results['true'] = final_results['true'].astype(int)

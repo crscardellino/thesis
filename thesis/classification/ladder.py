@@ -519,6 +519,9 @@ class LadderNetworksExperiment(object):
                             )
                             break
 
+            if i >= self._num_iter + 1:
+                tqdm.write('Lemma %s - Run all iterations' % self._lemma, file=sys.stderr)
+
             for corpus_split in ('train', 'test', 'validation'):
                 self._add_result(sess, corpus_split, 'final', feed_dicts[corpus_split])
 
@@ -596,6 +599,7 @@ if __name__ == '__main__':
             continue
         try:
             tf.reset_default_graph()
+            tf.set_random_seed(args.random_seed)
             ladder_networks = LadderNetworksExperiment(
                 labeled_train_data=data, labeled_train_target=target,
                 labeled_test_data=labeled_datasets.test_dataset.data(lemma),
@@ -611,14 +615,11 @@ if __name__ == '__main__':
 
             for rst_agg, rst in zip(results, ladder_networks.get_results()):
                 if rst is not None:
-                    rst.insert(0, 'error_sigma', ladder_networks.error_sigma)
-                    rst.insert(0, 'acceptance_threshold', ladder_networks.acceptance_threshold)
                     rst.insert(0, 'num_classes', ladder_networks.classes.shape[0])
                     rst.insert(0, 'lemma', lemma)
-                    rst.insert(0, 'noise', args.noise_std)
-                    rst.insert(0, 'epochs', args.epochs)
                     rst.insert(0, 'layers', '_'.join(str(l) for l in args.layers))
-                    rst.insert(0, 'classifier', 'ladder')
+                    rst.insert(0, 'classifier', 'mlp')
+                    rst.insert(0, 'algorithm', 'ladder')
                     rst.insert(0, 'vector_domain', args.vector_domain or 'NA')
                     rst.insert(0, 'representation', args.representation or 'NA')
                     rst.insert(0, 'corpus', args.corpus_name)

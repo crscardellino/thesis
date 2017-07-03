@@ -116,6 +116,7 @@ if __name__ == '__main__':
             continue
         try:
             tf.reset_default_graph()
+            tf.set_random_seed(args.random_seed)
             with tf.Session() as sess:
                 keras_backend.set_session(sess)
 

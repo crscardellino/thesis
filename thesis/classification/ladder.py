@@ -29,9 +29,8 @@ def _feature_transformer(feature):
 class LadderNetworksExperiment(object):
     def __init__(self, labeled_train_data, labeled_train_target, labeled_test_data, labeled_test_target,
                  unlabeled_data, labeled_features, unlabeled_features, layers, denoising_cost, min_count=2, lemma='',
-                 validation_ratio=0.2, acceptance_threshold=0.8, error_sigma=0.1, epochs=25, noise_std=0.3,
-                 learning_rate=0.01, random_seed=RANDOM_SEED, acceptance_alpha=0.05, error_alpha=0.05,
-                 decay_after=15, oversampling=False, predictions_only=False):
+                 validation_ratio=0.2, error_sigma=0.1, epochs=25, noise_std=0.3, learning_rate=0.01,
+                 random_seed=RANDOM_SEED, error_alpha=0.05, decay_after=15, oversampling=False, predictions_only=False):
         labeled_train_data = labeled_train_data.toarray() if issparse(labeled_train_data) else labeled_train_data
         labeled_test_data = labeled_test_data.toarray() if issparse(labeled_test_data) else labeled_test_data
         unlabeled_data = unlabeled_data.toarray() if issparse(unlabeled_data) else unlabeled_data
@@ -67,8 +66,6 @@ class LadderNetworksExperiment(object):
         self._classes_distribution = []
 
         self._lemma = lemma
-        self._acceptance_threshold = acceptance_threshold
-        self._acceptance_alpha = acceptance_alpha
         self._decay_after = decay_after
         self._error_sigma = error_sigma
         self._error_alpha = error_alpha
@@ -360,7 +357,7 @@ class LadderNetworksExperiment(object):
         # Add the results to the corresponding corpus split results
         self._prediction_results.append(results)
 
-    def _get_candidates(self, prediction_probabilities):
+    def _get_candidates(self, prediction_probabilities, acceptance_threshold=0.0):
         # Get the max probabilities per target
         max_probabilities = prediction_probabilities.max(axis=1)
 
@@ -368,15 +365,11 @@ class LadderNetworksExperiment(object):
         candidates = max_probabilities.argsort()[::-1]
 
         # If there is an acceptance threshold filter out candidates that doesn't comply it
-        if self._acceptance_threshold > 0:
-            over_threshold = np.where(max_probabilities[candidates].round(2) >= self._acceptance_threshold)[0]
+        if acceptance_threshold > 0:
+            over_threshold = np.where(max_probabilities[candidates].round(2) >= acceptance_threshold)[0]
             candidates = candidates[over_threshold]
 
         return candidates
-
-    @property
-    def acceptance_threshold(self):
-        return self._acceptance_threshold
 
     @property
     def classes(self):
@@ -478,13 +471,18 @@ class LadderNetworksExperiment(object):
                         # To compare against the bootstrap approach we use a similar way to select elements
                         # automatically annotated from the unlabeled corpus that we use after to see
                         # the classes progression
-                        candidates = self._get_candidates(prediction_probabilities)
+                        acceptance_threshold = 1.0
 
-                        while len(candidates) == 0 and self._acceptance_threshold > 0.5:
-                            # Check there is at least 1 iteration running. If not, adapt the acceptance threshold
-                            # Also, if the acceptance threshold is too high
-                            self._acceptance_threshold -= self._acceptance_alpha
-                            candidates = self._get_candidates(prediction_probabilities)
+                        # There's a min threshold to ensure the confidence is at least larger than random confindence
+                        minimum_threshold = 0.1 + 1.0 / np.float(self._classes.shape[0])
+
+                        while acceptance_threshold >= minimum_threshold:
+                            candidates = self._get_candidates(prediction_probabilities, acceptance_threshold)
+
+                            if len(candidates) > 0:
+                                break
+
+                            acceptance_threshold -= 0.01
 
                         target_candidates = self._classes[prediction_probabilities[candidates].argmax(axis=1)]
                         self._bootstrapped_indices.extend(unlabeled_dataset_index[bootstrap_mask][candidates])
@@ -536,7 +534,6 @@ if __name__ == '__main__':
     parser.add_argument('--denoising_cost', type=float, nargs='+', default=list())
     parser.add_argument('--epochs', type=int, default=25)
     parser.add_argument('--unlabeled_data_limit', type=int, default=1000)
-    parser.add_argument('--acceptance_threshold', type=float, default=0.8)
     parser.add_argument('--max_error', type=float, default=0.15)
     parser.add_argument('--error_sigma', type=float, default=0.1)
     parser.add_argument('--min_count', type=int, default=2)
@@ -608,8 +605,8 @@ if __name__ == '__main__':
                 labeled_features=features, layers=args.layers[:], denoising_cost=args.denoising_cost[:],
                 unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
                 min_count=args.min_count, validation_ratio=args.validation_ratio, noise_std=args.noise_std,
-                learning_rate=0.01, acceptance_threshold=args.acceptance_threshold, error_sigma=args.error_sigma,
-                lemma=lemma, random_seed=args.random_seed, oversampling=True, predictions_only=args.predictions_only)
+                learning_rate=0.01, error_sigma=args.error_sigma, lemma=lemma, random_seed=args.random_seed,
+                oversampling=True, predictions_only=args.predictions_only)
 
             ladder_networks.run()
 

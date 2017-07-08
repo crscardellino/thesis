@@ -30,7 +30,8 @@ class LadderNetworksExperiment(object):
     def __init__(self, labeled_train_data, labeled_train_target, labeled_test_data, labeled_test_target,
                  unlabeled_data, labeled_features, unlabeled_features, layers, denoising_cost, min_count=2, lemma='',
                  validation_ratio=0.2, error_sigma=0.1, epochs=25, noise_std=0.3, learning_rate=0.01,
-                 random_seed=RANDOM_SEED, error_alpha=0.05, decay_after=15, oversampling=False, predictions_only=False):
+                 random_seed=RANDOM_SEED, error_alpha=0.05, decay_after=15, oversampling=False, predictions_only=False,
+                 acceptance_alpha=0.01):
         labeled_train_data = labeled_train_data.toarray() if issparse(labeled_train_data) else labeled_train_data
         labeled_test_data = labeled_test_data.toarray() if issparse(labeled_test_data) else labeled_test_data
         unlabeled_data = unlabeled_data.toarray() if issparse(unlabeled_data) else unlabeled_data
@@ -67,6 +68,7 @@ class LadderNetworksExperiment(object):
 
         self._lemma = lemma
         self._decay_after = decay_after
+        self._acceptance_alpha = acceptance_alpha
         self._error_sigma = error_sigma
         self._error_alpha = error_alpha
         self._predictions_only = predictions_only
@@ -482,7 +484,7 @@ class LadderNetworksExperiment(object):
                             if len(candidates) > 0:
                                 break
 
-                            acceptance_threshold -= 0.01
+                            acceptance_threshold -= self._acceptance_alpha
 
                         target_candidates = self._classes[prediction_probabilities[candidates].argmax(axis=1)]
                         self._bootstrapped_indices.extend(unlabeled_dataset_index[bootstrap_mask][candidates])
@@ -535,6 +537,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=25)
     parser.add_argument('--unlabeled_data_limit', type=int, default=1000)
     parser.add_argument('--max_error', type=float, default=0.15)
+    parser.add_argument('--acceptance_alpha', type=float, default=0.01)
     parser.add_argument('--error_sigma', type=float, default=0.1)
     parser.add_argument('--min_count', type=int, default=2)
     parser.add_argument('--noise_std', type=float, default=0.3)
@@ -606,7 +609,7 @@ if __name__ == '__main__':
                 unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
                 min_count=args.min_count, validation_ratio=args.validation_ratio, noise_std=args.noise_std,
                 learning_rate=0.01, error_sigma=args.error_sigma, lemma=lemma, random_seed=args.random_seed,
-                oversampling=True, predictions_only=args.predictions_only)
+                oversampling=True, predictions_only=args.predictions_only, acceptance_alpha=args.acceptance_alpha)
 
             ladder_networks.run()
 

@@ -26,11 +26,13 @@ def _feature_transformer(feature):
 
 
 class SemiSupervisedWrapper(object):
+    _algorithm = 'SemiSupervised'
+
     def __init__(self, labeled_train_data, labeled_train_target, labeled_test_data, labeled_test_target,
                  unlabeled_data, labeled_features, unlabeled_features, min_count=2, validation_ratio=0.1,
-                 lemma='', acceptance_threshold=0.8, candidates_selection='max', candidates_limit=0, error_sigma=0.1,
-                 folds=0, random_seed=RANDOM_SEED, acceptance_alpha=0.05, error_alpha=0.05, oversampling=False,
-                 max_annotations=0, predictions_only=False):
+                 lemma='', candidates_selection='max', candidates_limit=0, error_sigma=0.1, folds=0,
+                 random_seed=RANDOM_SEED, error_alpha=0.05, oversampling=False, max_annotations=0,
+                 predictions_only=False, acceptance_alpha=0.01):
         filtered_values = filter_minimum(target=labeled_train_target[:], min_count=min_count)
         labeled_train_data = labeled_train_data.toarray() if issparse(labeled_train_data) else labeled_train_data
         labeled_test_data = labeled_test_data.toarray() if issparse(labeled_test_data) else labeled_test_data
@@ -71,6 +73,7 @@ class SemiSupervisedWrapper(object):
 
         self._prediction_results = []
         self._error_progression = []
+        self._acceptance_alpha = acceptance_alpha
         self._error_sigma = error_sigma
         self._error_alpha = error_alpha
         self._features_progression = []
@@ -78,8 +81,6 @@ class SemiSupervisedWrapper(object):
         self._cross_validation_results = []
 
         self._folds = folds
-        self._acceptance_threshold = acceptance_threshold
-        self._acceptance_alpha = acceptance_alpha
         self._candidates_selection = candidates_selection
         self._candidates_limit = candidates_limit
         self._max_annotations = max_annotations
@@ -93,11 +94,7 @@ class SemiSupervisedWrapper(object):
     def error_sigma(self):
         return self._error_sigma
 
-    @property
-    def acceptance_threshold(self):
-        return self._acceptance_threshold
-
-    def _get_candidates(self, prediction_probabilities):
+    def _get_candidates(self, prediction_probabilities, acceptance_threshold=0.0):
         # Get the max probabilities per target
         max_probabilities = prediction_probabilities.max(axis=1)
 
@@ -116,8 +113,8 @@ class SemiSupervisedWrapper(object):
             candidates = candidates[:self._candidates_limit]
 
         # If there is an acceptance threshold filter out candidates that doesn't comply it
-        if self._acceptance_threshold > 0:
-            over_threshold = np.where(max_probabilities[candidates].round(2) >= self._acceptance_threshold)[0]
+        if acceptance_threshold > 0:
+            over_threshold = np.where(max_probabilities[candidates].round(2) >= acceptance_threshold)[0]
             candidates = candidates[over_threshold]
 
         return candidates
@@ -282,14 +279,21 @@ class SemiSupervisedWrapper(object):
             masked_unlabeled_data = self._unlabeled_data[bootstrap_mask]
             prediction_probabilities = self._model.predict_proba(masked_unlabeled_data)
 
-            candidates = self._get_candidates(prediction_probabilities)
+            # We set the initial threshold to 1 for SelfLearning, otherwise 0
+            acceptance_threshold = 1.0 if self._algorithm == 'SelfLearning' else 0.0
 
-            if len(candidates) == 0 and self._acceptance_threshold > 0.5:  # No candidates, lower the threshold
-                self._acceptance_threshold -= self._acceptance_alpha
-                continue
-            elif len(candidates) == 0:
+            # There's a min threshold to ensure the confidence is at least larger than random confindence
+            minimum_threshold = 0.1 + 1.0 / np.float(self._classes.shape[0])
+
+            candidates = self._get_candidates(prediction_probabilities, acceptance_threshold)
+
+            while len(candidates) == 0 and acceptance_threshold >= minimum_threshold:
+                candidates = self._get_candidates(prediction_probabilities, acceptance_threshold)
+                acceptance_threshold -= self._acceptance_alpha
+
+            if len(candidates) == 0:
                 tqdm.write('Lemma %s - Max predicted probability: %.2f - Acceptance threshold: %.2f'
-                           % (self._lemma, prediction_probabilities.max(), self._acceptance_threshold),
+                           % (self._lemma, prediction_probabilities.max(), acceptance_threshold),
                            file=sys.stderr)
                 break
 
@@ -357,11 +361,15 @@ class SemiSupervisedWrapper(object):
 
 
 class SelfLearningWrapper(SemiSupervisedWrapper):
+    _algorithm = 'SelfLearning'
+
     def _get_target_candidates(self, prediction_probabilities=None, candidates=None):
         return self._classes[prediction_probabilities[candidates].argmax(axis=1)]
 
 
 class ActiveLearningWrapper(SemiSupervisedWrapper):
+    _algorithm = 'ActiveLearning'
+
     def __init__(self, **kwargs):
         self._unlabeled_target = kwargs.pop('unlabeled_target', np.array([]))
         self._unlabeled_sentences = kwargs.pop('unlabeled_sentences', None)

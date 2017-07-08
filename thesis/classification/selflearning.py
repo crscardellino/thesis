@@ -35,7 +35,7 @@ if __name__ == '__main__':
     parser.add_argument('--candidates_limit', type=int, default=0)
     parser.add_argument('--min_count', type=int, default=2)
     parser.add_argument('--validation_ratio', type=float, default=0.2)
-    parser.add_argument('--acceptance_threshold', type=float, default=0.8)
+    parser.add_argument('--acceptance_alpha', type=float, default=0.01)
     parser.add_argument('--error_sigma', type=float, default=0.1)
     parser.add_argument('--lemmas', nargs='+', default=set())
     parser.add_argument('--random_seed', type=int, default=1234)
@@ -126,7 +126,7 @@ if __name__ == '__main__':
                     labeled_test_target=labeled_datasets.test_dataset.target(lemma),
                     unlabeled_data=unlabeled_dataset.data(lemma, limit=args.unlabeled_data_limit),
                     labeled_features=features, min_count=args.min_count, validation_ratio=args.validation_ratio,
-                    acceptance_threshold=args.acceptance_threshold, random_seed=args.random_seed,
+                    acceptance_alpha=args.acceptance_alpha, random_seed=args.random_seed,
                     unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
                     candidates_limit=args.candidates_limit, error_sigma=args.error_sigma, lemma=lemma,
                     oversampling=True, predictions_only=args.predictions_only)

@@ -39,6 +39,7 @@ if __name__ == '__main__':
     parser.add_argument('--error_sigma', type=float, default=0.1)
     parser.add_argument('--lemmas', nargs='+', default=set())
     parser.add_argument('--random_seed', type=int, default=1234)
+    parser.add_argument('--folds', type=int, default=0)
     parser.add_argument('--corpus_name', default='NA')
     parser.add_argument('--representation', default='NA')
     parser.add_argument('--vector_domain', default='NA')
@@ -102,7 +103,9 @@ if __name__ == '__main__':
     certainty_progression = []
     features_progression = []
     cross_validation_results = []
-    results = (prediction_results, certainty_progression, features_progression, cross_validation_results)
+    overfitting_measure_results = []
+    results = (prediction_results, certainty_progression, features_progression,
+               cross_validation_results, overfitting_measure_results)
     bootstrapped_instances = []
     bootstrapped_targets = []
 
@@ -129,7 +132,7 @@ if __name__ == '__main__':
                     acceptance_alpha=args.acceptance_alpha, random_seed=args.random_seed,
                     unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
                     candidates_limit=args.candidates_limit, error_sigma=args.error_sigma, lemma=lemma,
-                    oversampling=True, predictions_only=args.predictions_only)
+                    oversampling=True, predictions_only=args.predictions_only, overfitting_folds=args.folds)
 
                 iterations = semisupervised.run(CLASSIFIERS[args.classifier], config)
 
@@ -192,3 +195,8 @@ if __name__ == '__main__':
     except (ValueError, MemoryError) as e:
         print(e.args, file=sys.stderr)
 
+    try:
+        pd.concat(overfitting_measure_results, ignore_index=True) \
+            .to_csv('%s_overfitting_measure_results.csv' % args.base_results_path, index=False, float_format='%.2e')
+    except (ValueError, MemoryError) as e:
+        print(e.args, file=sys.stderr)

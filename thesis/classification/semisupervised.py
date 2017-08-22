@@ -25,6 +25,55 @@ def _feature_transformer(feature):
         return feature
 
 
+def _cross_validation_folds(folds, model_class, model_config, train_data, train_target, iteration):
+    validation_errors = []
+    cross_validation = []
+    cv = StratifiedKFold(folds)
+    try:
+        _ = next(cv.split(train_data, train_target))
+    except ValueError:
+        cv = KFold(folds)
+
+    for fold_no, (train_indices, test_indices) in enumerate(cv.split(train_data, train_target), start=1):
+        cv_train_data = train_data[train_indices]
+        cv_test_data = train_data[test_indices]
+        cv_train_target = train_target[train_indices]
+        cv_test_target = train_target[test_indices]
+
+        try:
+            model = model_class(**model_config)
+            model.fit(cv_train_data, cv_train_target)
+        except ValueError:
+            if np.unique(cv_train_target).shape[0] > 1:
+                raise
+            else:
+                model = BaselineClassifier()
+                model.fit(cv_train_data, cv_train_target)
+
+        cv_train_results = pd.DataFrame(
+            {'true': cv_train_target.astype(np.int32),
+             'prediction': model.predict(cv_train_data).astype(np.int32)},
+            columns=['true', 'prediction']
+        )
+        cv_train_results.insert(0, 'fold', fold_no)
+        cv_train_results.insert(0, 'corpus_split', 'train')
+        cv_train_results.insert(0, 'iteration', iteration)
+
+        cv_test_results = pd.DataFrame(
+            {'true': cv_test_target.astype(np.int32),
+             'prediction': model.predict(cv_test_data).astype(np.int32)},
+            columns=['true', 'prediction']
+        )
+        cv_test_results.insert(0, 'fold', fold_no)
+        cv_test_results.insert(0, 'corpus_split', 'test')
+        cv_test_results.insert(0, 'iteration', iteration)
+
+        validation_errors.append(zero_one_loss(cv_test_results.true, cv_test_results.prediction))
+        cross_validation.append(pd.concat([cv_train_results, cv_test_results], ignore_index=True))
+
+    return validation_errors, cross_validation, np.mean(validation_errors), None
+
+
 class SemiSupervisedWrapper(object):
     _algorithm = 'SemiSupervised'
 
@@ -32,7 +81,7 @@ class SemiSupervisedWrapper(object):
                  unlabeled_data, labeled_features, unlabeled_features, min_count=2, validation_ratio=0.1,
                  lemma='', candidates_selection='max', candidates_limit=0, error_sigma=0.1, folds=0,
                  random_seed=RANDOM_SEED, error_alpha=0.05, oversampling=False, max_annotations=0,
-                 predictions_only=False, acceptance_alpha=0.01):
+                 predictions_only=False, acceptance_alpha=0.01, overfitting_folds=0):
         filtered_values = filter_minimum(target=labeled_train_target[:], min_count=min_count)
         labeled_train_data = labeled_train_data.toarray() if issparse(labeled_train_data) else labeled_train_data
         labeled_test_data = labeled_test_data.toarray() if issparse(labeled_test_data) else labeled_test_data
@@ -85,6 +134,8 @@ class SemiSupervisedWrapper(object):
         self._candidates_limit = candidates_limit
         self._max_annotations = max_annotations
         self._predictions_only = predictions_only
+        self._overfitting_folds = overfitting_folds
+        self._overfitting_measure_results = []
 
     @property
     def classes(self):
@@ -167,52 +218,8 @@ class SemiSupervisedWrapper(object):
 
     def _validate(self, model_class, model_config, train_data, train_target, iteration):
         if self._folds > 0:
-            validation_errors = []
-            cross_validation = []
-            cv = StratifiedKFold(self._folds)
-            try:
-                _ = next(cv.split(train_data, train_target))
-            except ValueError:
-                cv = KFold(self._folds)
-
-            for fold_no, (train_indices, test_indices) in enumerate(cv.split(train_data, train_target), start=1):
-                cv_train_data = train_data[train_indices]
-                cv_test_data = train_data[test_indices]
-                cv_train_target = train_target[train_indices]
-                cv_test_target = train_target[test_indices]
-
-                try:
-                    model = model_class(**model_config)
-                    model.fit(cv_train_data, cv_train_target)
-                except ValueError:
-                    if np.unique(cv_train_target).shape[0] > 1:
-                        raise
-                    else:
-                        model = BaselineClassifier()
-                        model.fit(cv_train_data, cv_train_target)
-
-                cv_train_results = pd.DataFrame(
-                    {'true': cv_train_target.astype(np.int32),
-                     'prediction': model.predict(cv_train_data).astype(np.int32)},
-                    columns=['true', 'prediction']
-                )
-                cv_train_results.insert(0, 'fold', fold_no)
-                cv_train_results.insert(0, 'corpus_split', 'train')
-                cv_train_results.insert(0, 'iteration', iteration)
-
-                cv_test_results = pd.DataFrame(
-                    {'true': cv_test_target.astype(np.int32),
-                     'prediction': model.predict(cv_test_data).astype(np.int32)},
-                    columns=['true', 'prediction']
-                )
-                cv_test_results.insert(0, 'fold', fold_no)
-                cv_test_results.insert(0, 'corpus_split', 'test')
-                cv_test_results.insert(0, 'iteration', iteration)
-
-                validation_errors.append(zero_one_loss(cv_test_results.true, cv_test_results.prediction))
-                cross_validation.append(pd.concat([cv_train_results, cv_test_results], ignore_index=True))
-
-            return validation_errors, cross_validation, np.mean(validation_errors), None
+            return _cross_validation_folds(self._folds, model_class, model_config,
+                                           train_data, train_target, iteration)
         else:
             new_model = model_class(**model_config)
             new_model.fit(train_data, train_target)
@@ -246,7 +253,11 @@ class SemiSupervisedWrapper(object):
         cross_validation_results = pd.concat(self._cross_validation_results, ignore_index=True)\
             if self._folds > 0 else None
 
-        return prediction_results, certainty_progression, features_progression, cross_validation_results
+        overfitting_measure_results = pd.concat(self._overfitting_measure_results, ignore_index=True)\
+            if self._overfitting_folds > 0 else None
+
+        return prediction_results, certainty_progression, features_progression, \
+            cross_validation_results, overfitting_measure_results
 
     def run(self, model_class, model_config):
         self._model = model_class(**model_config)
@@ -336,6 +347,12 @@ class SemiSupervisedWrapper(object):
                 self._model.fit(train_data, train_target)
             else:
                 self._model = new_model
+
+            if self._overfitting_folds > 0:
+                self._overfitting_measure_results.extend(
+                    _cross_validation_folds(
+                        self._overfitting_folds, model_class, model_config,
+                        train_data, train_target, iteration)[1])
 
             self._bootstrapped_indices.extend(unlabeled_dataset_index[bootstrap_mask][candidates][valid_candidates])
             self._bootstrapped_targets.extend(target_candidates)

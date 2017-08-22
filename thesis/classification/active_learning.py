@@ -129,8 +129,10 @@ if __name__ == '__main__':
     certainty_progression = []
     features_progression = []
     cross_validation_results = []
+    overfitting_measure_results = []
     senses = []
-    results = (prediction_results, certainty_progression, features_progression, cross_validation_results)
+    results = (prediction_results, certainty_progression, features_progression,
+               cross_validation_results, overfitting_measure_results)
     bootstrapped_instances = []
     bootstrapped_targets = []
     text_sentences = {}
@@ -266,5 +268,11 @@ if __name__ == '__main__':
     try:
         pd.concat(cross_validation_results, ignore_index=True) \
             .to_csv('%s_cross_validation_results.csv' % args.base_results_path, index=False, float_format='%.2e')
+    except (ValueError, MemoryError) as e:
+        print(e.args, file=sys.stderr)
+
+    try:
+        pd.concat(overfitting_measure_results, ignore_index=True) \
+            .to_csv('%s_overfitting_measure_results.csv' % args.base_results_path, index=False, float_format='%.2e')
     except (ValueError, MemoryError) as e:
         print(e.args, file=sys.stderr)

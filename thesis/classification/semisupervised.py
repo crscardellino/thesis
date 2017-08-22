@@ -275,6 +275,12 @@ class SemiSupervisedWrapper(object):
         if self._folds > 0:
             self._cross_validation_results.extend(cross_validation)
 
+        if self._overfitting_folds > 0:
+            self._overfitting_measure_results.extend(
+                _cross_validation_folds(
+                    self._overfitting_folds, model_class, model_config,
+                    self._labeled_train_data, self._labeled_train_target, 'initial')[1])
+
         iteration = 0
         bootstrap_mask = np.ones(self._unlabeled_data.shape[0], dtype=np.bool)
         unlabeled_dataset_index = np.arange(self._unlabeled_data.shape[0], dtype=np.int32)

@@ -354,12 +354,6 @@ class SemiSupervisedWrapper(object):
             else:
                 self._model = new_model
 
-            if self._overfitting_folds > 0:
-                self._overfitting_measure_results.extend(
-                    _cross_validation_folds(
-                        self._overfitting_folds, model_class, model_config,
-                        train_data, train_target, iteration)[1])
-
             self._bootstrapped_indices.extend(unlabeled_dataset_index[bootstrap_mask][candidates][valid_candidates])
             self._bootstrapped_targets.extend(target_candidates)
             self._error_progression.append(validation_error)
@@ -367,6 +361,12 @@ class SemiSupervisedWrapper(object):
 
             for corpus_split in ('train', 'validation'):
                 self._add_results(corpus_split, iteration)
+
+            if self._overfitting_folds > 0:
+                self._overfitting_measure_results.extend(
+                    _cross_validation_folds(
+                        self._overfitting_folds, model_class, model_config,
+                        train_data, train_target, iteration)[1])
 
             if not self._predictions_only:
                 # Add the certainty of the predicted classes of the unseen examples to the certainty progression results

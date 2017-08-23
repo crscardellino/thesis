@@ -2,17 +2,19 @@
 
 from __future__ import absolute_import, unicode_literals
 
+import keras.backend as keras_backend
 import numpy as np
 import pandas as pd
 import scipy.sparse as sps
 import sys
+import tensorflow as tf
 
 from imblearn.over_sampling import RandomOverSampler
 from itertools import compress
 from scipy.sparse import issparse
 from sklearn.metrics import zero_one_loss
 from sklearn.model_selection import StratifiedKFold, KFold
-from thesis.classification import BaselineClassifier
+from thesis.classification import BaselineClassifier, KerasMultilayerPerceptron
 from thesis.constants import RANDOM_SEED
 from thesis.dataset.utils import filter_minimum, validation_split
 from tqdm import tqdm
@@ -35,6 +37,8 @@ def _cross_validation_folds(folds, model_class, model_config, train_data, train_
         cv = KFold(folds)
 
     for fold_no, (train_indices, test_indices) in enumerate(cv.split(train_data, train_target), start=1):
+        tf.reset_default_graph()
+
         cv_train_data = train_data[train_indices]
         cv_test_data = train_data[test_indices]
         cv_train_target = train_target[train_indices]
@@ -276,10 +280,17 @@ class SemiSupervisedWrapper(object):
             self._cross_validation_results.extend(cross_validation)
 
         if self._overfitting_folds > 0:
+            # Save the keras model if so
+            if self._model.__class__.__name__ == 'KerasMultilayerPerceptron':
+                self._model.save_model('/tmp/keras_temporal_model_selflearning_')
+
             self._overfitting_measure_results.extend(
                 _cross_validation_folds(
                     self._overfitting_folds, model_class, model_config,
                     self._labeled_train_data, self._labeled_train_target, 'initial')[1])
+
+            if self._model.__class__.__name__ == 'KerasMultilayerPerceptron':
+                self._model = KerasMultilayerPerceptron.load_model('/tmp/keras_temporal_model_selflearning_')
 
         iteration = 0
         bootstrap_mask = np.ones(self._unlabeled_data.shape[0], dtype=np.bool)
@@ -363,10 +374,16 @@ class SemiSupervisedWrapper(object):
                 self._add_results(corpus_split, iteration)
 
             if self._overfitting_folds > 0:
+                if self._model.__class__.__name__ == 'KerasMultilayerPerceptron':
+                    self._model.save_model('/tmp/keras_temporal_model_selflearning_')
+
                 self._overfitting_measure_results.extend(
                     _cross_validation_folds(
                         self._overfitting_folds, model_class, model_config,
                         train_data, train_target, iteration)[1])
+
+                if self._model.__class__.__name__ == 'KerasMultilayerPerceptron':
+                    self._model = KerasMultilayerPerceptron.load_model('/tmp/keras_temporal_model_selflearning_')
 
             if not self._predictions_only:
                 # Add the certainty of the predicted classes of the unseen examples to the certainty progression results

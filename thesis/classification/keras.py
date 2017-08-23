@@ -3,8 +3,9 @@
 from __future__ import absolute_import, unicode_literals
 
 import numpy as np
+import pickle
 
-from keras.models import Sequential
+from keras.models import Sequential, load_model
 from keras.layers import Dense, Dropout
 from keras.regularizers import l1, l2, l1l2
 from keras.utils.np_utils import to_categorical
@@ -102,3 +103,39 @@ class KerasMultilayerPerceptron(object):
 
         x = x.toarray() if issparse(x) else x
         return self._model.predict(x, verbose=self._verbosity)
+
+    def save_model(self, base_path):
+        attrs = {
+            'layers': self._layers,
+            'layers_activation': self._layers_activation,
+            'classification_layer_activation': self._classification_layer_activation,
+            'layers_initialization': self._layers_initialization,
+            'dropout_layers': self._dropout_layers,
+            'optimizer': self._optimizer,
+            'loss': self._loss,
+            'epochs': self._epochs,
+            'batch_size': self._batch_size,
+            'metrics': self._metrics,
+            'l1': self._l1,
+            'l2': self._l2,
+            'verbosity': self._verbosity,
+            'classes': self._classes
+        }
+
+        with open('%s_model_attrs.p' % base_path, 'wb') as fh:
+            pickle.dump(attrs, fh)
+
+        self._model.save('%s_model.h5')
+
+    @staticmethod
+    def load_model(base_path):
+        with open('%s_model_attrs.p' % base_path, 'rb') as fh:
+            attrs = pickle.load(fh)
+
+        classes = attrs.pop('classes', None)
+
+        keras_model = KerasMultilayerPerceptron(**attrs)
+        keras_model._classes = classes
+        keras_model._model = load_model('%s_model.h5' % base_path)
+
+        return keras_model

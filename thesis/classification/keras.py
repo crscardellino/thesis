@@ -125,7 +125,7 @@ class KerasMultilayerPerceptron(object):
         with open('%s_model_attrs.p' % base_path, 'wb') as fh:
             pickle.dump(attrs, fh)
 
-        self._model.save('%s_model.h5')
+        self._model.save('%s_model.h5' % base_path)
 
     @staticmethod
     def load_model(base_path):

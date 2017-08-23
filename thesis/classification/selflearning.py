@@ -118,45 +118,43 @@ if __name__ == '__main__':
         if args.lemmas and lemma not in args.lemmas:
             continue
         try:
-            tf.reset_default_graph()
+            keras_backend.clear_session()
             tf.set_random_seed(args.random_seed)
-            with tf.Session() as sess:
-                keras_backend.set_session(sess)
 
-                semisupervised = SelfLearningWrapper(
-                    labeled_train_data=data, labeled_train_target=target,
-                    labeled_test_data=labeled_datasets.test_dataset.data(lemma),
-                    labeled_test_target=labeled_datasets.test_dataset.target(lemma),
-                    unlabeled_data=unlabeled_dataset.data(lemma, limit=args.unlabeled_data_limit),
-                    labeled_features=features, min_count=args.min_count, validation_ratio=args.validation_ratio,
-                    acceptance_alpha=args.acceptance_alpha, random_seed=args.random_seed,
-                    unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
-                    candidates_limit=args.candidates_limit, error_sigma=args.error_sigma, lemma=lemma,
-                    oversampling=True, predictions_only=args.predictions_only, overfitting_folds=args.folds)
+            semisupervised = SelfLearningWrapper(
+                labeled_train_data=data, labeled_train_target=target,
+                labeled_test_data=labeled_datasets.test_dataset.data(lemma),
+                labeled_test_target=labeled_datasets.test_dataset.target(lemma),
+                unlabeled_data=unlabeled_dataset.data(lemma, limit=args.unlabeled_data_limit),
+                labeled_features=features, min_count=args.min_count, validation_ratio=args.validation_ratio,
+                acceptance_alpha=args.acceptance_alpha, random_seed=args.random_seed,
+                unlabeled_features=unlabeled_dataset.features_dictionaries(lemma, limit=args.unlabeled_data_limit),
+                candidates_limit=args.candidates_limit, error_sigma=args.error_sigma, lemma=lemma,
+                oversampling=True, predictions_only=args.predictions_only, overfitting_folds=args.folds)
 
-                iterations = semisupervised.run(CLASSIFIERS[args.classifier], config)
+            iterations = semisupervised.run(CLASSIFIERS[args.classifier], config)
 
-                if iterations > 0:
-                    for rst_agg, rst in zip(results, semisupervised.get_results()):
-                        if rst is not None:
-                            rst.insert(0, 'num_classes', semisupervised.classes.shape[0])
-                            rst.insert(0, 'lemma', lemma)
-                            rst.insert(0, 'layers', '_'.join(str(l) for l in args.layers) if args.layers else 'NA')
-                            rst.insert(0, 'classifier', args.classifier)
-                            rst.insert(0, 'algorithm', 'selflearning')
-                            rst.insert(0, 'vector_domain', args.vector_domain or 'NA')
-                            rst.insert(0, 'representation', args.representation or 'NA')
-                            rst.insert(0, 'corpus', args.corpus_name)
-                            rst_agg.append(rst)
+            if iterations > 0:
+                for rst_agg, rst in zip(results, semisupervised.get_results()):
+                    if rst is not None:
+                        rst.insert(0, 'num_classes', semisupervised.classes.shape[0])
+                        rst.insert(0, 'lemma', lemma)
+                        rst.insert(0, 'layers', '_'.join(str(l) for l in args.layers) if args.layers else 'NA')
+                        rst.insert(0, 'classifier', args.classifier)
+                        rst.insert(0, 'algorithm', 'selflearning')
+                        rst.insert(0, 'vector_domain', args.vector_domain or 'NA')
+                        rst.insert(0, 'representation', args.representation or 'NA')
+                        rst.insert(0, 'corpus', args.corpus_name)
+                        rst_agg.append(rst)
 
-                    # Save the bootstrapped data
-                    bi, bt = semisupervised.bootstrapped()
-                    bootstrapped_targets.extend(bt)
+                # Save the bootstrapped data
+                bi, bt = semisupervised.bootstrapped()
+                bootstrapped_targets.extend(bt)
 
-                    ul_instances = unlabeled_dataset.instances_id(lemma, limit=args.unlabeled_data_limit)
-                    bootstrapped_instances.extend(':'.join(ul_instances[idx]) for idx in bi)
-                else:
-                    tqdm.write('Lemma %s - No iterations' % lemma, file=sys.stderr)
+                ul_instances = unlabeled_dataset.instances_id(lemma, limit=args.unlabeled_data_limit)
+                bootstrapped_instances.extend(':'.join(ul_instances[idx]) for idx in bi)
+            else:
+                tqdm.write('Lemma %s - No iterations' % lemma, file=sys.stderr)
         except NotEnoughSensesError:
             tqdm.write('Lemma %s - Not enough senses with at least %d occurrences'
                        % (lemma, args.min_count), file=sys.stderr)

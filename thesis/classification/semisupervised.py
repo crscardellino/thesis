@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sps
 import sys
-import tensorflow as tf
 
 from imblearn.over_sampling import RandomOverSampler
 from itertools import compress
@@ -37,7 +36,7 @@ def _cross_validation_folds(folds, model_class, model_config, train_data, train_
         cv = KFold(folds)
 
     for fold_no, (train_indices, test_indices) in enumerate(cv.split(train_data, train_target), start=1):
-        tf.reset_default_graph()
+        keras_backend.clear_session()
 
         cv_train_data = train_data[train_indices]
         cv_test_data = train_data[test_indices]

@@ -386,7 +386,9 @@ class SemiSupervisedWrapper(object):
 
             if not self._predictions_only:
                 # Add the certainty of the predicted classes of the unseen examples to the certainty progression results
-                certainty_df = pd.DataFrame(prediction_probabilities.max(axis=1), columns=['certainty'])
+                certainty_df = pd.DataFrame({'certainty': prediction_probabilities.max(axis=1),
+                                             'target': prediction_probabilities.argmax(axis=1)},
+                                            columns=['target', 'certainty'])
                 certainty_df.insert(0, 'iteration', iteration)
                 self._certainty_progression.append(certainty_df)
 

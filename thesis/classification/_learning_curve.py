@@ -64,6 +64,8 @@ def learning_curve_training(estimator, data, target, estimator_config=None, fold
                 keras_backend.set_session(sess)
 
                 train_indices, test_indices = train_test_split(np.arange(train_data.shape[0]), test_size=test_size)
+                while np.unique(train_target[train_indices]).shape[0] > 1:
+                    train_indices, test_indices = train_test_split(np.arange(train_data.shape[0]), test_size=test_size)
 
                 fold_train_data = train_data[train_indices]
                 fold_test_data = train_data[test_indices]

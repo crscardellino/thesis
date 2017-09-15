@@ -100,6 +100,8 @@ if __name__ == '__main__':
                         default=None,
                         type=str,
                         help='Vector domain.')
+    parser.add_argument('--lemmas', nargs='+', default=set())
+    parser.add_argument('--random_seed', type=int, default=1234)
 
     args = parser.parse_args()
 
@@ -124,6 +126,9 @@ if __name__ == '__main__':
     if args.layers:
         config['layers'] = args.layers
 
+    if args.lemmas:
+        args.lemmas = set(args.lemmas) if not isinstance(args.lemmas, set) else args.lemmas
+
     print('Loading data', file=sys.stderr)
     datasets = SenseCorpusDatasets(args.train_dataset, args.test_dataset,
                                    word_vector_model_path=args.word_vectors_model_path,
@@ -136,6 +141,9 @@ if __name__ == '__main__':
     print('Training models and getting results', file=sys.stderr)
     for lemma, data, target in tqdm(datasets.train_dataset.traverse_dataset_by_lemma(),
                                     total=datasets.train_dataset.num_lemmas):
+        if args.lemmas and lemma not in args.lemmas:
+            continue
+
         selector = SelectKBest(FEATURE_SELECTION[args.feature_selection], k=args.max_features)
 
         if args.folds > 0:
@@ -166,7 +174,7 @@ if __name__ == '__main__':
 
             for learning_curve_results in learning_curve_training(CLASSIFIERS[args.classifier], data, target,
                                                                   args.classifier_config, args.folds, args.splits,
-                                                                  args.min_count):
+                                                                  args.min_count, random_seed=args.random_seed):
                 learning_curve_results.insert(0, 'num_classes', minimum_counts.shape[0])
                 learning_curve_results.insert(0, 'lemma', lemma)
                 learning_curve_results.insert(0, 'layers',

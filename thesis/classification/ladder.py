@@ -345,8 +345,8 @@ class LadderNetworksExperiment(object):
             )
         elif corpus_split == 'test' and iteration == 'final':
             error = zero_one_loss(y_true, y_pred)
-            tqdm.write('Test error: %.2f - Test accuracy: %.2f' % (error, 1.0 - error),
-                       file=sys.stderr, end='\n\n')
+            tqdm.write('Test error: %.2f - Test accuracy: %.2f\n\n' % (error, 1.0 - error),
+                       file=sys.stderr)
 
         # Calculate cross entropy error (perhaps better with the algorithm by itself)
         # and update the results of the iteration giving the predictions
@@ -430,9 +430,6 @@ class LadderNetworksExperiment(object):
                     self._outputs: to_categorical(np.searchsorted(self._classes, self._labeled_validation_target))
                 }
             }
-
-            for corpus_split in ('train', 'test', 'validation'):
-                self._add_result(sess, corpus_split, 'initial', feed_dicts[corpus_split])
 
             bootstrap_mask = np.ones(self._unlabeled_data.shape[0], dtype=np.bool)
             unlabeled_dataset_index = np.arange(self._unlabeled_data.shape[0], dtype=np.int32)

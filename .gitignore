@@ -119,3 +119,4 @@ logs/
 helpers/*.sh
 helpers/to_run/
 !helpers/slurm.sh
+*.iml

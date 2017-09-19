@@ -91,7 +91,7 @@ if __name__ == '__main__':
         valid_lemmas = pickle.load(f)
         valid_lemmas = {lemma for lemma, (_, count) in
                         valid_lemmas[LANGUAGE[args.corpus_language]]['lemmas'].items()
-                        if count[count >= 3].shape[0] > 1}
+                        if count[count >= 2].shape[0] > 1}
 
     print('Getting instances', file=sys.stderr)
 

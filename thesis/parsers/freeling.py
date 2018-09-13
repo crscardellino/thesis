@@ -14,7 +14,7 @@ else:
 
 
 _INPUT_FORMATS = {'text', 'freeling', 'conll'}
-_INPUT_LEVELS = {'plain', 'token', 'splitted', 'morfo', 'tagged', 'shallow', 'dep'}
+_INPUT_LEVELS = {'text', 'token', 'splitted', 'morfo', 'tagged', 'shallow', 'dep'}
 _OUTPUT_FORMATS = {'freeling', 'conll', 'xml', 'json', 'naf', 'train'}
 _OUTPUT_LEVELS = {'ident', 'token', 'splitted', 'morfo', 'tagged', 'shallow',
                   'parsed', 'dep', 'coref', 'semgraph'}
@@ -27,7 +27,7 @@ class Freeling(object):
 
     _freeling_cmd = 'analyze'
 
-    def __init__(self, language=None, input_format='text', input_level='plain',
+    def __init__(self, language=None, input_format='text', input_level='text',
                  output_format='freeling', output_level='tagged', multiword=True,
                  ner=True, nec=False, sense=None, config_file_path=None):
         assert (language is not None and language in _LANGUAGES) or config_file_path is not None, \
